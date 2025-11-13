@@ -4,6 +4,7 @@ import Keypad from './components/Keypad';
 import PlayersList from './components/PlayersList';
 import CurrentTurn from './components/CurrentTurn';
 import History from './components/History';
+import Statistics from './components/Statistics';
 import GameSetup from './components/GameSetup';
 import { getCheckoutSuggestion } from './utils/checkouts';
 
@@ -18,7 +19,7 @@ function App() {
   const [totalLegs, setTotalLegs] = useState(1);
 
   // UI state
-  const [activeTab, setActiveTab] = useState('dartboard'); // 'dartboard', 'keypad', 'history'
+  const [activeTab, setActiveTab] = useState('dartboard'); // 'dartboard', 'keypad', 'history', 'stats'
 
   // Players state
   const [players, setPlayers] = useState([
@@ -169,26 +170,49 @@ function App() {
           style={{ backgroundColor: '#1a1f2e' }}
         >
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <svg
-                className="w-6 h-6"
-                style={{ color: '#a3e635' }}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              <span className="text-white font-semibold">
-                Game: <span style={{ color: '#a3e635' }}>{gameType} ({gameFormat})</span>
-              </span>
+            <div>
+              <h1 className="text-2xl font-bold" style={{ color: '#a3e635' }}>
+                Darts Scores
+              </h1>
+              <p className="text-sm text-gray-400 mt-0.5">
+                {gameType} • {gameFormat}
+              </p>
             </div>
           </div>
+
+          <button
+            onClick={() => {
+              if (confirm('Start a new game? Current progress will be lost.')) {
+                setGameStarted(false);
+                setThrowHistory([]);
+                setCurrentDarts([]);
+              }
+            }}
+            className="px-4 py-2 rounded-lg font-semibold transition-all hover:opacity-90 flex items-center gap-2"
+            style={{ backgroundColor: '#4a4a4a', color: 'white' }}
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4v16m8-8H4"
+              />
+            </svg>
+            New Game
+          </button>
+        </div>
+
+        {/* Game Info Bar */}
+        <div
+          className="rounded-lg p-3 mb-6 flex flex-wrap items-center gap-6"
+          style={{ backgroundColor: '#0f1419' }}
+        >
 
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
@@ -298,11 +322,28 @@ function App() {
                     History
                   </div>
                 </button>
+                <button
+                  onClick={() => setActiveTab('stats')}
+                  className="px-4 py-2 rounded-t-lg font-semibold transition-colors border-b-2"
+                  style={{
+                    backgroundColor: activeTab === 'stats' ? '#2a3f2e' : 'transparent',
+                    borderColor: activeTab === 'stats' ? '#a3e635' : 'transparent',
+                    color: activeTab === 'stats' ? 'white' : '#888'
+                  }}
+                >
+                  <div className="flex items-center gap-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    Stats
+                  </div>
+                </button>
               </div>
 
               {activeTab === 'dartboard' && <Dartboard onScoreSelect={handleScoreSelect} />}
               {activeTab === 'keypad' && <Keypad onScoreSelect={handleScoreSelect} />}
               {activeTab === 'history' && <History throwHistory={throwHistory} players={players} />}
+              {activeTab === 'stats' && <Statistics throwHistory={throwHistory} players={players} />}
             </div>
           </div>
         </div>
