@@ -1,8 +1,9 @@
 const API_BASE_URL = 'http://localhost:3001/api';
 
 // Players
-export const getPlayers = async () => {
+export const getAllPlayers = async () => {
   const response = await fetch(`${API_BASE_URL}/players`);
+  if (!response.ok) throw new Error('Failed to fetch players');
   return response.json();
 };
 
@@ -12,7 +13,18 @@ export const createPlayer = async (name) => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name }),
   });
+  if (!response.ok) throw new Error('Failed to create player');
   return response.json();
+};
+
+export const getOrCreatePlayer = async (name) => {
+  // Try to find existing player
+  const players = await getAllPlayers();
+  const existing = players.find(p => p.name.toLowerCase() === name.toLowerCase());
+  if (existing) return existing;
+
+  // Create new player if not found
+  return createPlayer(name);
 };
 
 // Games

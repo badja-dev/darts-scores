@@ -1,4 +1,4 @@
-const CurrentTurn = ({ darts, onUndo, onReset, suggestedCheckout }) => {
+const CurrentTurn = ({ darts, onUndo, onReset, onCompleteTurn, suggestedCheckout, gameComplete }) => {
   return (
     <div className="space-y-4">
       <div className="rounded-lg p-6" style={{ backgroundColor: '#1a1f2e' }}>
@@ -22,13 +22,13 @@ const CurrentTurn = ({ darts, onUndo, onReset, suggestedCheckout }) => {
         </div>
 
         {/* Action buttons */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 mb-3">
           <button
             onClick={onUndo}
-            disabled={darts.length === 0}
+            disabled={darts.length === 0 || gameComplete}
             className="px-4 py-2 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             style={{
-              backgroundColor: darts.length === 0 ? '#2a2a2a' : '#4a4a4a',
+              backgroundColor: darts.length === 0 || gameComplete ? '#2a2a2a' : '#4a4a4a',
               color: 'white',
             }}
           >
@@ -49,16 +49,29 @@ const CurrentTurn = ({ darts, onUndo, onReset, suggestedCheckout }) => {
           </button>
           <button
             onClick={onReset}
-            disabled={darts.length === 0}
+            disabled={darts.length === 0 || gameComplete}
             className="px-4 py-2 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
-              backgroundColor: darts.length === 0 ? '#2a2a2a' : '#4a4a4a',
+              backgroundColor: darts.length === 0 || gameComplete ? '#2a2a2a' : '#4a4a4a',
               color: 'white',
             }}
           >
             Reset
           </button>
         </div>
+
+        {/* Complete Turn button */}
+        <button
+          onClick={onCompleteTurn}
+          disabled={darts.length === 0 || gameComplete}
+          className="w-full px-4 py-3 rounded-lg font-bold text-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{
+            backgroundColor: darts.length === 0 || gameComplete ? '#2a2a2a' : '#a3e635',
+            color: darts.length === 0 || gameComplete ? '#888' : '#0a0e1a',
+          }}
+        >
+          Complete Turn
+        </button>
       </div>
 
       {/* Suggested checkout */}
