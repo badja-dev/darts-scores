@@ -3,9 +3,14 @@ import Dartboard from './components/Dartboard';
 import Keypad from './components/Keypad';
 import PlayersList from './components/PlayersList';
 import CurrentTurn from './components/CurrentTurn';
+import History from './components/History';
+import GameSetup from './components/GameSetup';
 import { getCheckoutSuggestion } from './utils/checkouts';
 
 function App() {
+  // Game setup state
+  const [gameStarted, setGameStarted] = useState(false);
+
   // Game state
   const [gameType, setGameType] = useState('501');
   const [gameFormat, setGameFormat] = useState('Double Out');
@@ -24,6 +29,9 @@ function App() {
 
   // Current turn state
   const [currentDarts, setCurrentDarts] = useState([]);
+
+  // Throw history
+  const [throwHistory, setThrowHistory] = useState([]);
 
   // Suggested checkout
   const [suggestedCheckout, setSuggestedCheckout] = useState(null);
@@ -62,6 +70,15 @@ function App() {
     // Check for bust (score would go below 0 or to exactly 1)
     if (newScore < 0 || newScore === 1) {
       // Bust! Complete turn without updating score
+      // Add darts to history marked as bust
+      const historyDarts = newDarts.map(dart => ({
+        ...dart,
+        playerId: currentPlayer.id,
+        bust: true,
+        remainingScore: currentPlayer.score
+      }));
+      setThrowHistory(prev => [...prev, ...historyDarts]);
+
       setTimeout(() => {
         alert(`${currentPlayer.name} BUST!`);
         setCurrentDarts([]);
@@ -75,6 +92,15 @@ function App() {
 
     // If 3 darts thrown, move to next player
     if (newDarts.length === 3) {
+      // Add complete turn to history
+      const historyDarts = newDarts.map(dart => ({
+        ...dart,
+        playerId: currentPlayer.id,
+        bust: false,
+        remainingScore: newScore
+      }));
+      setThrowHistory(prev => [...prev, ...historyDarts]);
+
       setTimeout(() => {
         setCurrentDarts([]);
         nextPlayer();
@@ -100,6 +126,7 @@ function App() {
     );
     setCurrentPlayerIndex(0);
     setCurrentDarts([]);
+    setThrowHistory([]);
   };
 
   // Move to next player
@@ -118,6 +145,20 @@ function App() {
   const handleReset = () => {
     setCurrentDarts([]);
   };
+
+  // Handle game start
+  const handleStartGame = ({ players: newPlayers, gameType: newGameType, format: newFormat }) => {
+    const startingScore = parseInt(newGameType);
+    setPlayers(newPlayers.map(p => ({ ...p, score: startingScore })));
+    setGameType(newGameType);
+    setGameFormat(newFormat);
+    setGameStarted(true);
+  };
+
+  // Show setup screen if game hasn't started
+  if (!gameStarted) {
+    return <GameSetup onStartGame={handleStartGame} />;
+  }
 
   return (
     <div className="min-h-screen p-4 md:p-8" style={{ backgroundColor: '#0a0e1a' }}>
@@ -261,25 +302,7 @@ function App() {
 
               {activeTab === 'dartboard' && <Dartboard onScoreSelect={handleScoreSelect} />}
               {activeTab === 'keypad' && <Keypad onScoreSelect={handleScoreSelect} />}
-              {activeTab === 'history' && (
-                <div className="text-center py-12 text-gray-400">
-                  <svg
-                    className="w-16 h-16 mx-auto mb-4 opacity-50"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                  <p className="text-lg font-semibold">History Coming Soon</p>
-                  <p className="text-sm mt-2">View your past throws and statistics</p>
-                </div>
-              )}
+              {activeTab === 'history' && <History throwHistory={throwHistory} players={players} />}
             </div>
           </div>
         </div>
