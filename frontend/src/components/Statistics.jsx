@@ -1,4 +1,4 @@
-const Statistics = ({ throwHistory, players }) => {
+const Statistics = ({ throwHistory, players, gameComplete }) => {
   const calculatePlayerStats = (playerId) => {
     const playerThrows = throwHistory.filter(t => t.playerId === playerId && !t.bust);
 
@@ -86,7 +86,12 @@ const Statistics = ({ throwHistory, players }) => {
                 </div>
                 <div>
                   <h3 className="text-xl font-bold text-white">{player.name}</h3>
-                  <p className="text-sm text-gray-400">Current Score: {player.score}</p>
+                  <p className="text-sm text-gray-400">
+                    {gameComplete
+                      ? (player.score === 0 ? 'Winner!' : `Final Score: ${player.score}`)
+                      : `Current Score: ${player.score}`
+                    }
+                  </p>
                 </div>
               </div>
             </div>

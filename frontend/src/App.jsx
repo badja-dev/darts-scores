@@ -1,16 +1,24 @@
 import { useState, useEffect } from 'react';
 import Dartboard from './components/Dartboard';
 import Keypad from './components/Keypad';
+import Table from './components/Table';
 import PlayersList from './components/PlayersList';
 import CurrentTurn from './components/CurrentTurn';
 import History from './components/History';
 import Statistics from './components/Statistics';
 import GameSetup from './components/GameSetup';
 import { getCheckoutSuggestion } from './utils/checkouts';
+import { getOrCreatePlayer, createGame } from './services/api';
 
 function App() {
   // Game setup state
   const [gameStarted, setGameStarted] = useState(false);
+  const [gameComplete, setGameComplete] = useState(false);
+
+  // Database IDs
+  const [gameId, setGameId] = useState(null);
+  const [legId, setLegId] = useState(null);
+  const [dbPlayerIds, setDbPlayerIds] = useState({}); // Maps local player ID to database player ID
 
   // Game state
   const [gameType, setGameType] = useState('501');
@@ -19,7 +27,7 @@ function App() {
   const [totalLegs, setTotalLegs] = useState(1);
 
   // UI state
-  const [activeTab, setActiveTab] = useState('dartboard'); // 'dartboard', 'keypad', 'history', 'stats'
+  const [activeTab, setActiveTab] = useState('dartboard'); // 'dartboard', 'keypad', 'table', 'history', 'stats'
 
   // Players state
   const [players, setPlayers] = useState([
@@ -48,65 +56,42 @@ function App() {
 
   // Handle score selection from dartboard
   const handleScoreSelect = (score, multiplier) => {
-    if (currentDarts.length >= 3) return;
+    if (currentDarts.length >= 3 || gameComplete) return;
 
     const totalScore = score * multiplier;
     const newDarts = [...currentDarts, { score: totalScore, multiplier }];
     setCurrentDarts(newDarts);
 
-    // Check for win or if turn is complete
+    // Update score immediately
     const currentPlayer = players[currentPlayerIndex];
     const newScore = currentPlayer.score - totalScore;
 
-    // Check for exact finish with double (Double Out rule)
-    if (newScore === 0 && multiplier === 2) {
-      // Winner!
+    // Check for exact finish with double (Double Out rule) or Straight Out
+    const isWin = gameFormat === 'Double Out'
+      ? (newScore === 0 && multiplier === 2)
+      : (newScore === 0);
+
+    if (isWin) {
+      // Winner! Update score and mark game complete
+      updatePlayerScore(totalScore);
       setTimeout(() => {
         alert(`${currentPlayer.name} wins!`);
-        resetGame();
-      }, 500);
+        setGameComplete(true);
+      }, 300);
       return;
     }
 
     // Check for bust (score would go below 0 or to exactly 1)
     if (newScore < 0 || newScore === 1) {
-      // Bust! Complete turn without updating score
-      // Add darts to history marked as bust
-      const historyDarts = newDarts.map(dart => ({
-        ...dart,
-        playerId: currentPlayer.id,
-        bust: true,
-        remainingScore: currentPlayer.score
-      }));
-      setThrowHistory(prev => [...prev, ...historyDarts]);
-
+      // Bust! Don't update score
       setTimeout(() => {
         alert(`${currentPlayer.name} BUST!`);
-        setCurrentDarts([]);
-        nextPlayer();
-      }, 500);
+      }, 300);
       return;
     }
 
-    // Normal scoring
+    // Normal scoring - update player score
     updatePlayerScore(totalScore);
-
-    // If 3 darts thrown, move to next player
-    if (newDarts.length === 3) {
-      // Add complete turn to history
-      const historyDarts = newDarts.map(dart => ({
-        ...dart,
-        playerId: currentPlayer.id,
-        bust: false,
-        remainingScore: newScore
-      }));
-      setThrowHistory(prev => [...prev, ...historyDarts]);
-
-      setTimeout(() => {
-        setCurrentDarts([]);
-        nextPlayer();
-      }, 500);
-    }
   };
 
   // Update player score
@@ -120,14 +105,25 @@ function App() {
     );
   };
 
-  // Reset game
-  const resetGame = () => {
-    setPlayers(prevPlayers =>
-      prevPlayers.map(player => ({ ...player, score: 501 }))
-    );
-    setCurrentPlayerIndex(0);
+  // Complete turn - add to history and move to next player
+  const handleCompleteTurn = () => {
+    if (currentDarts.length === 0 || gameComplete) return;
+
+    const currentPlayer = players[currentPlayerIndex];
+    const currentScore = currentPlayer.score;
+
+    // Add turn to history
+    const historyDarts = currentDarts.map((dart, index) => ({
+      ...dart,
+      playerId: currentPlayer.id,
+      bust: false,
+      remainingScore: currentScore - currentDarts.slice(0, index + 1).reduce((sum, d) => sum + d.score, 0)
+    }));
+    setThrowHistory(prev => [...prev, ...historyDarts]);
+
+    // Clear current darts and move to next player
     setCurrentDarts([]);
-    setThrowHistory([]);
+    nextPlayer();
   };
 
   // Move to next player
@@ -135,15 +131,35 @@ function App() {
     setCurrentPlayerIndex((prev) => (prev + 1) % players.length);
   };
 
-  // Undo last dart
+  // Undo last dart - also undo the score change
   const handleUndo = () => {
     if (currentDarts.length > 0) {
+      const lastDart = currentDarts[currentDarts.length - 1];
+      // Restore the score
+      setPlayers((prevPlayers) =>
+        prevPlayers.map((player, index) =>
+          index === currentPlayerIndex
+            ? { ...player, score: player.score + lastDart.score }
+            : player
+        )
+      );
+      // Remove the dart
       setCurrentDarts((prev) => prev.slice(0, -1));
     }
   };
 
-  // Reset current turn
+  // Reset current turn - restore all scores from this turn
   const handleReset = () => {
+    if (currentDarts.length > 0) {
+      const totalToRestore = currentDarts.reduce((sum, dart) => sum + dart.score, 0);
+      setPlayers((prevPlayers) =>
+        prevPlayers.map((player, index) =>
+          index === currentPlayerIndex
+            ? { ...player, score: player.score + totalToRestore }
+            : player
+        )
+      );
+    }
     setCurrentDarts([]);
   };
 
@@ -182,10 +198,12 @@ function App() {
 
           <button
             onClick={() => {
-              if (confirm('Start a new game? Current progress will be lost.')) {
+              if (confirm('Start a new game? All data will be cleared.')) {
                 setGameStarted(false);
+                setGameComplete(false);
                 setThrowHistory([]);
                 setCurrentDarts([]);
+                setCurrentPlayerIndex(0);
               }
             }}
             className="px-4 py-2 rounded-lg font-semibold transition-all hover:opacity-90 flex items-center gap-2"
@@ -266,7 +284,9 @@ function App() {
               darts={currentDarts}
               onUndo={handleUndo}
               onReset={handleReset}
+              onCompleteTurn={handleCompleteTurn}
               suggestedCheckout={suggestedCheckout}
+              gameComplete={gameComplete}
             />
           </div>
 
@@ -307,6 +327,22 @@ function App() {
                   </div>
                 </button>
                 <button
+                  onClick={() => setActiveTab('table')}
+                  className="px-4 py-2 rounded-t-lg font-semibold transition-colors border-b-2"
+                  style={{
+                    backgroundColor: activeTab === 'table' ? '#2a3f2e' : 'transparent',
+                    borderColor: activeTab === 'table' ? '#a3e635' : 'transparent',
+                    color: activeTab === 'table' ? 'white' : '#888'
+                  }}
+                >
+                  <div className="flex items-center gap-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    Table
+                  </div>
+                </button>
+                <button
                   onClick={() => setActiveTab('history')}
                   className="px-4 py-2 rounded-t-lg font-semibold transition-colors border-b-2"
                   style={{
@@ -342,8 +378,9 @@ function App() {
 
               {activeTab === 'dartboard' && <Dartboard onScoreSelect={handleScoreSelect} />}
               {activeTab === 'keypad' && <Keypad onScoreSelect={handleScoreSelect} />}
+              {activeTab === 'table' && <Table onScoreSelect={handleScoreSelect} />}
               {activeTab === 'history' && <History throwHistory={throwHistory} players={players} />}
-              {activeTab === 'stats' && <Statistics throwHistory={throwHistory} players={players} />}
+              {activeTab === 'stats' && <Statistics throwHistory={throwHistory} players={players} gameComplete={gameComplete} />}
             </div>
           </div>
         </div>

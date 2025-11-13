@@ -1,10 +1,35 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { getAllPlayers } from '../services/api';
 
 const GameSetup = ({ onStartGame }) => {
-  const [player1Name, setPlayer1Name] = useState('Player 1');
-  const [player2Name, setPlayer2Name] = useState('Player 2');
+  const [player1Name, setPlayer1Name] = useState('');
+  const [player2Name, setPlayer2Name] = useState('');
   const [gameType, setGameType] = useState('501');
   const [format, setFormat] = useState('Double Out');
+  const [existingPlayers, setExistingPlayers] = useState([]);
+  const [showPlayer1Suggestions, setShowPlayer1Suggestions] = useState(false);
+  const [showPlayer2Suggestions, setShowPlayer2Suggestions] = useState(false);
+
+  // Load existing players on mount
+  useEffect(() => {
+    const loadPlayers = async () => {
+      try {
+        const players = await getAllPlayers();
+        setExistingPlayers(players);
+      } catch (error) {
+        console.error('Failed to load players:', error);
+      }
+    };
+    loadPlayers();
+  }, []);
+
+  // Filter suggestions based on input
+  const getFilteredSuggestions = (input) => {
+    if (!input) return existingPlayers;
+    return existingPlayers.filter(p =>
+      p.name.toLowerCase().includes(input.toLowerCase())
+    );
+  };
 
   const handleStartGame = () => {
     if (!player1Name.trim() || !player2Name.trim()) {
@@ -84,14 +109,20 @@ const GameSetup = ({ onStartGame }) => {
           {/* Player Names */}
           <div className="mb-6">
             <label className="block text-sm font-semibold text-gray-300 mb-3">
-              Players
+              Players {existingPlayers.length > 0 && <span className="text-xs text-gray-500">({existingPlayers.length} known players)</span>}
             </label>
             <div className="space-y-3">
-              <div>
+              {/* Player 1 with autocomplete */}
+              <div className="relative">
                 <input
                   type="text"
                   value={player1Name}
-                  onChange={(e) => setPlayer1Name(e.target.value)}
+                  onChange={(e) => {
+                    setPlayer1Name(e.target.value);
+                    setShowPlayer1Suggestions(true);
+                  }}
+                  onFocus={() => setShowPlayer1Suggestions(true)}
+                  onBlur={() => setTimeout(() => setShowPlayer1Suggestions(false), 200)}
                   placeholder="Player 1 Name"
                   className="w-full px-4 py-3 rounded-lg font-medium focus:outline-none focus:ring-2"
                   style={{
@@ -100,19 +131,40 @@ const GameSetup = ({ onStartGame }) => {
                     borderWidth: '2px',
                     borderColor: 'transparent',
                   }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = '#a3e635';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = 'transparent';
-                  }}
                 />
+                {showPlayer1Suggestions && getFilteredSuggestions(player1Name).length > 0 && (
+                  <div
+                    className="absolute z-10 w-full mt-1 rounded-lg overflow-hidden"
+                    style={{ backgroundColor: '#1a1f2e', maxHeight: '200px', overflowY: 'auto' }}
+                  >
+                    {getFilteredSuggestions(player1Name).map((player) => (
+                      <button
+                        key={player.id}
+                        onClick={() => {
+                          setPlayer1Name(player.name);
+                          setShowPlayer1Suggestions(false);
+                        }}
+                        className="w-full px-4 py-2 text-left hover:opacity-80 transition-opacity"
+                        style={{ backgroundColor: '#0f1419', color: 'white', borderBottom: '1px solid #2a2a2a' }}
+                      >
+                        {player.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-              <div>
+
+              {/* Player 2 with autocomplete */}
+              <div className="relative">
                 <input
                   type="text"
                   value={player2Name}
-                  onChange={(e) => setPlayer2Name(e.target.value)}
+                  onChange={(e) => {
+                    setPlayer2Name(e.target.value);
+                    setShowPlayer2Suggestions(true);
+                  }}
+                  onFocus={() => setShowPlayer2Suggestions(true)}
+                  onBlur={() => setTimeout(() => setShowPlayer2Suggestions(false), 200)}
                   placeholder="Player 2 Name"
                   className="w-full px-4 py-3 rounded-lg font-medium focus:outline-none focus:ring-2"
                   style={{
@@ -121,13 +173,27 @@ const GameSetup = ({ onStartGame }) => {
                     borderWidth: '2px',
                     borderColor: 'transparent',
                   }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = '#a3e635';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = 'transparent';
-                  }}
                 />
+                {showPlayer2Suggestions && getFilteredSuggestions(player2Name).length > 0 && (
+                  <div
+                    className="absolute z-10 w-full mt-1 rounded-lg overflow-hidden"
+                    style={{ backgroundColor: '#1a1f2e', maxHeight: '200px', overflowY: 'auto' }}
+                  >
+                    {getFilteredSuggestions(player2Name).map((player) => (
+                      <button
+                        key={player.id}
+                        onClick={() => {
+                          setPlayer2Name(player.name);
+                          setShowPlayer2Suggestions(false);
+                        }}
+                        className="w-full px-4 py-2 text-left hover:opacity-80 transition-opacity"
+                        style={{ backgroundColor: '#0f1419', color: 'white', borderBottom: '1px solid #2a2a2a' }}
+                      >
+                        {player.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
