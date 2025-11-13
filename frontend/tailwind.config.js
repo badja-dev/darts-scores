@@ -7,10 +7,10 @@ export default {
   theme: {
     extend: {
       colors: {
-        'darts-bg': '#0a0e1a',
-        'darts-card': '#1a1f2e',
-        'darts-primary': '#a3e635',
-        'darts-secondary': '#ec4899',
+        'darts-bg': 'var(--color-darts-bg)',
+        'darts-card': 'var(--color-darts-card)',
+        'darts-primary': 'var(--color-darts-primary)',
+        'darts-secondary': 'var(--color-darts-secondary)',
       }
     },
   },
