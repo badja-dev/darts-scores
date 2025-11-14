@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getAllPlayers } from '../services/api';
 
-const GameSetup = ({ onStartGame }) => {
+const GameSetup = ({ onStartGame, onViewHistory }) => {
   const [player1Name, setPlayer1Name] = useState('');
   const [player2Name, setPlayer2Name] = useState('');
   const [gameType, setGameType] = useState('501');
@@ -208,6 +208,20 @@ const GameSetup = ({ onStartGame }) => {
             }}
           >
             Start Game
+          </button>
+
+          {/* View History Button */}
+          <button
+            onClick={onViewHistory}
+            className="w-full py-3 rounded-lg font-semibold transition-all hover:opacity-80 mt-3"
+            style={{
+              backgroundColor: '#1a1f2e',
+              color: '#a3e635',
+              borderColor: '#a3e635',
+              borderWidth: '2px',
+            }}
+          >
+            View Player History
           </button>
 
           {/* Game Info */}

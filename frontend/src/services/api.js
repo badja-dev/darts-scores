@@ -51,6 +51,32 @@ export const getGame = async (gameId) => {
   return response.json();
 };
 
+// Legs
+export const createLeg = async (gameId, legNumber) => {
+  const response = await fetch(`${API_BASE_URL}/legs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      game_id: gameId,
+      leg_number: legNumber,
+    }),
+  });
+  if (!response.ok) throw new Error('Failed to create leg');
+  return response.json();
+};
+
+export const completeLeg = async (legId, winnerId) => {
+  const response = await fetch(`${API_BASE_URL}/legs/${legId}/complete`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      winner_id: winnerId,
+    }),
+  });
+  if (!response.ok) throw new Error('Failed to complete leg');
+  return response.json();
+};
+
 // Throws
 export const recordThrow = async (legId, playerId, throwNumber, dartNumber, score, multiplier, isMiss) => {
   const response = await fetch(`${API_BASE_URL}/throws`, {
@@ -66,11 +92,19 @@ export const recordThrow = async (legId, playerId, throwNumber, dartNumber, scor
       is_miss: isMiss,
     }),
   });
+  if (!response.ok) throw new Error('Failed to record throw');
   return response.json();
 };
 
 // Statistics
 export const getPlayerStatistics = async (playerId) => {
   const response = await fetch(`${API_BASE_URL}/players/${playerId}/statistics`);
+  return response.json();
+};
+
+// Get player game history
+export const getPlayerGames = async (playerId) => {
+  const response = await fetch(`${API_BASE_URL}/players/${playerId}/games`);
+  if (!response.ok) throw new Error('Failed to fetch player games');
   return response.json();
 };

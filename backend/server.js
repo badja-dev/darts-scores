@@ -56,8 +56,10 @@ app.get('/api/games', (req, res) => {
 app.post('/api/games', (req, res) => {
   try {
     const { game_type, format, player_ids } = req.body;
+    console.log('Creating game with:', { game_type, format, player_ids });
 
     if (!game_type || !format || !player_ids || player_ids.length === 0) {
+      console.error('Missing required fields for game creation');
       return res.status(400).json({ error: 'Game type, format, and players are required' });
     }
 
@@ -79,8 +81,10 @@ app.post('/api/games', (req, res) => {
     const gameId = transaction(game_type, format, player_ids);
     const game = db.prepare('SELECT * FROM games WHERE id = ?').get(gameId);
 
+    console.log('Game created successfully:', game);
     res.status(201).json(game);
   } catch (error) {
+    console.error('Error creating game:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -109,6 +113,52 @@ app.get('/api/games/:id', (req, res) => {
     `).all(id);
 
     res.json({ ...game, players, statistics });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create a new leg
+app.post('/api/legs', (req, res) => {
+  try {
+    const { game_id, leg_number } = req.body;
+    console.log('Creating leg with:', { game_id, leg_number });
+
+    if (!game_id || !leg_number) {
+      console.error('Missing game_id or leg_number');
+      return res.status(400).json({ error: 'Game ID and leg number are required' });
+    }
+
+    // Check if game exists
+    const game = db.prepare('SELECT * FROM games WHERE id = ?').get(game_id);
+    if (!game) {
+      console.error('Game not found:', game_id);
+      return res.status(404).json({ error: 'Game not found' });
+    }
+
+    const stmt = db.prepare('INSERT INTO legs (game_id, leg_number) VALUES (?, ?)');
+    const result = stmt.run(game_id, leg_number);
+
+    const leg = db.prepare('SELECT * FROM legs WHERE id = ?').get(result.lastInsertRowid);
+    console.log('Leg created successfully:', leg);
+    res.status(201).json(leg);
+  } catch (error) {
+    console.error('Error creating leg:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Complete a leg (set winner)
+app.patch('/api/legs/:id/complete', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { winner_id } = req.body;
+
+    const stmt = db.prepare('UPDATE legs SET winner_id = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ?');
+    stmt.run(winner_id, id);
+
+    const leg = db.prepare('SELECT * FROM legs WHERE id = ?').get(id);
+    res.json(leg);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -155,6 +205,81 @@ app.get('/api/players/:id/statistics', (req, res) => {
 
     res.json(stats);
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get player game history
+app.get('/api/players/:id/games', (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Get all games for this player with results
+    const games = db.prepare(`
+      SELECT
+        g.id,
+        g.game_type,
+        g.format,
+        g.created_at,
+        g.completed_at,
+        l.id as leg_id,
+        l.leg_number,
+        l.winner_id,
+        l.completed_at as leg_completed_at
+      FROM games g
+      JOIN game_players gp ON g.id = gp.game_id
+      LEFT JOIN legs l ON g.id = l.game_id
+      WHERE gp.player_id = ?
+      ORDER BY g.created_at DESC, l.leg_number ASC
+    `).all(id);
+
+    // Get player names for each game
+    const gamesWithPlayers = [];
+    const gameIds = [...new Set(games.map(g => g.id))];
+
+    gameIds.forEach(gameId => {
+      const gameLegs = games.filter(g => g.id === gameId);
+      const firstLeg = gameLegs[0];
+
+      // Get all players in this game
+      const players = db.prepare(`
+        SELECT p.id, p.name
+        FROM players p
+        JOIN game_players gp ON p.id = gp.player_id
+        WHERE gp.game_id = ?
+      `).all(gameId);
+
+      // Count legs won by each player
+      const legResults = db.prepare(`
+        SELECT winner_id, COUNT(*) as legs_won
+        FROM legs
+        WHERE game_id = ? AND winner_id IS NOT NULL
+        GROUP BY winner_id
+      `).all(gameId);
+
+      const legsWonMap = {};
+      legResults.forEach(r => {
+        legsWonMap[r.winner_id] = r.legs_won;
+      });
+
+      gamesWithPlayers.push({
+        id: firstLeg.id,
+        game_type: firstLeg.game_type,
+        format: firstLeg.format,
+        created_at: firstLeg.created_at,
+        completed_at: firstLeg.completed_at,
+        players: players.map(p => ({
+          ...p,
+          legs_won: legsWonMap[p.id] || 0
+        })),
+        total_legs: gameLegs.filter(l => l.leg_id).length,
+        completed_legs: gameLegs.filter(l => l.leg_completed_at).length
+      });
+    });
+
+    res.json(gamesWithPlayers);
+  } catch (error) {
+    console.error('Error fetching player games:', error);
     res.status(500).json({ error: error.message });
   }
 });
