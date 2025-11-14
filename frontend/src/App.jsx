@@ -7,10 +7,14 @@ import CurrentTurn from './components/CurrentTurn';
 import History from './components/History';
 import Statistics from './components/Statistics';
 import GameSetup from './components/GameSetup';
+import PlayerHistory from './components/PlayerHistory';
 import { getCheckoutSuggestion } from './utils/checkouts';
-import { getOrCreatePlayer, createGame } from './services/api';
+import { getOrCreatePlayer, createGame, createLeg, recordThrow, completeLeg } from './services/api';
 
 function App() {
+  // View state
+  const [view, setView] = useState('setup'); // 'setup', 'game', 'history'
+
   // Game setup state
   const [gameStarted, setGameStarted] = useState(false);
   const [gameComplete, setGameComplete] = useState(false);
@@ -74,6 +78,19 @@ function App() {
     if (isWin) {
       // Winner! Update score and mark game complete
       updatePlayerScore(totalScore);
+
+      // Complete the leg in database
+      const handleWin = async () => {
+        try {
+          const dbPlayerId = dbPlayerIds[currentPlayer.id];
+          await completeLeg(legId, dbPlayerId);
+          console.log('Leg completed in database');
+        } catch (error) {
+          console.error('Failed to complete leg:', error);
+        }
+      };
+      handleWin();
+
       setTimeout(() => {
         alert(`${currentPlayer.name} wins!`);
         setGameComplete(true);
@@ -105,25 +122,51 @@ function App() {
     );
   };
 
-  // Complete turn - add to history and move to next player
-  const handleCompleteTurn = () => {
+  // Complete turn - add to history, save to database, and move to next player
+  const handleCompleteTurn = async () => {
     if (currentDarts.length === 0 || gameComplete) return;
 
     const currentPlayer = players[currentPlayerIndex];
     const currentScore = currentPlayer.score;
+    const dbPlayerId = dbPlayerIds[currentPlayer.id];
 
-    // Add turn to history
-    const historyDarts = currentDarts.map((dart, index) => ({
-      ...dart,
-      playerId: currentPlayer.id,
-      bust: false,
-      remainingScore: currentScore - currentDarts.slice(0, index + 1).reduce((sum, d) => sum + d.score, 0)
-    }));
-    setThrowHistory(prev => [...prev, ...historyDarts]);
+    try {
+      // Calculate throw number (how many turns this player has taken)
+      const playerTurns = throwHistory.filter(t => t.playerId === currentPlayer.id).length / 3;
+      const throwNumber = Math.floor(playerTurns) + 1;
 
-    // Clear current darts and move to next player
-    setCurrentDarts([]);
-    nextPlayer();
+      // Record each dart to database
+      for (let i = 0; i < currentDarts.length; i++) {
+        const dart = currentDarts[i];
+        await recordThrow(
+          legId,
+          dbPlayerId,
+          throwNumber,
+          i + 1, // dart_number (1, 2, or 3)
+          dart.score,
+          dart.multiplier,
+          dart.score === 0 // is_miss
+        );
+      }
+
+      // Add turn to history (frontend)
+      const historyDarts = currentDarts.map((dart, index) => ({
+        ...dart,
+        playerId: currentPlayer.id,
+        bust: false,
+        remainingScore: currentScore - currentDarts.slice(0, index + 1).reduce((sum, d) => sum + d.score, 0)
+      }));
+      setThrowHistory(prev => [...prev, ...historyDarts]);
+
+      // Clear current darts and move to next player
+      setCurrentDarts([]);
+      nextPlayer();
+
+      console.log('Turn saved to database');
+    } catch (error) {
+      console.error('Failed to save turn:', error);
+      alert('Failed to save turn. Please try again.');
+    }
   };
 
   // Move to next player
@@ -164,17 +207,50 @@ function App() {
   };
 
   // Handle game start
-  const handleStartGame = ({ players: newPlayers, gameType: newGameType, format: newFormat }) => {
-    const startingScore = parseInt(newGameType);
-    setPlayers(newPlayers.map(p => ({ ...p, score: startingScore })));
-    setGameType(newGameType);
-    setGameFormat(newFormat);
-    setGameStarted(true);
+  const handleStartGame = async ({ players: newPlayers, gameType: newGameType, format: newFormat }) => {
+    try {
+      const startingScore = parseInt(newGameType);
+
+      // Create or get players from database
+      const dbPlayer1 = await getOrCreatePlayer(newPlayers[0].name);
+      const dbPlayer2 = await getOrCreatePlayer(newPlayers[1].name);
+
+      // Map local player IDs to database IDs
+      const playerIdMap = {
+        [newPlayers[0].id]: dbPlayer1.id,
+        [newPlayers[1].id]: dbPlayer2.id,
+      };
+      setDbPlayerIds(playerIdMap);
+
+      // Create game in database
+      const game = await createGame(newGameType, newFormat, [dbPlayer1.id, dbPlayer2.id]);
+      setGameId(game.id);
+
+      // Create first leg
+      const leg = await createLeg(game.id, 1);
+      setLegId(leg.id);
+
+      // Set up frontend state
+      setPlayers(newPlayers.map(p => ({ ...p, score: startingScore })));
+      setGameType(newGameType);
+      setGameFormat(newFormat);
+      setGameStarted(true);
+
+      console.log('Game created:', { game, leg, playerIdMap });
+    } catch (error) {
+      console.error('Failed to start game:', error);
+      alert('Failed to start game. Please try again.');
+    }
   };
+
+  // Show different views based on state
+  if (view === 'history') {
+    return <PlayerHistory onBack={() => setView('setup')} />;
+  }
 
   // Show setup screen if game hasn't started
   if (!gameStarted) {
-    return <GameSetup onStartGame={handleStartGame} />;
+    return <GameSetup onStartGame={handleStartGame} onViewHistory={() => setView('history')} />;
   }
 
   return (
