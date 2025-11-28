@@ -263,7 +263,8 @@ app.get('/api/players/:id/games', (req, res) => {
       });
 
       gamesWithPlayers.push({
-        id: firstLeg.id,
+        id: firstLeg.leg_id,  // Use leg_id for statistics lookup
+        game_id: firstLeg.id,  // Keep game_id separate
         game_type: firstLeg.game_type,
         format: firstLeg.format,
         created_at: firstLeg.created_at,
@@ -280,6 +281,127 @@ app.get('/api/players/:id/games', (req, res) => {
     res.json(gamesWithPlayers);
   } catch (error) {
     console.error('Error fetching player games:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get statistics for a specific leg and player
+app.get('/api/legs/:legId/players/:playerId/statistics', (req, res) => {
+  try {
+    const { legId, playerId } = req.params;
+
+    // Get all throws for this player in this leg
+    const throws = db.prepare(`
+      SELECT score, multiplier, is_miss, throw_number, dart_number
+      FROM throws
+      WHERE leg_id = ? AND player_id = ?
+      ORDER BY throw_number, dart_number
+    `).all(legId, playerId);
+
+    if (throws.length === 0) {
+      return res.json({
+        totalDarts: 0,
+        totalScore: 0,
+        average: 0,
+        threeDartAverage: 0,
+        highestScore: 0,
+        doubles: 0,
+        triples: 0,
+        turns: 0
+      });
+    }
+
+    // Calculate statistics
+    const totalScore = throws.reduce((sum, t) => sum + t.score, 0);
+    const doubles = throws.filter(t => t.multiplier === 2).length;
+    const triples = throws.filter(t => t.multiplier === 3).length;
+    const highestScore = Math.max(...throws.map(t => t.score));
+
+    // Calculate 3-dart average by grouping by throw_number
+    const turnScores = {};
+    throws.forEach(t => {
+      if (!turnScores[t.throw_number]) {
+        turnScores[t.throw_number] = 0;
+      }
+      turnScores[t.throw_number] += t.score;
+    });
+
+    const turns = Object.values(turnScores);
+    const threeDartAverage = turns.length > 0
+      ? turns.reduce((sum, score) => sum + score, 0) / turns.length
+      : 0;
+
+    const stats = {
+      totalDarts: throws.length,
+      totalScore,
+      average: totalScore / throws.length,
+      threeDartAverage,
+      highestScore,
+      doubles,
+      triples,
+      turns: turns.length
+    };
+
+    res.json(stats);
+  } catch (error) {
+    console.error('Error fetching leg statistics:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete a specific game (cascades to legs, throws, game_players)
+app.delete('/api/games/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log('Deleting game:', id);
+
+    const stmt = db.prepare('DELETE FROM games WHERE id = ?');
+    const result = stmt.run(id);
+
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'Game not found' });
+    }
+
+    console.log('Game deleted successfully:', id);
+    res.json({ success: true, message: 'Game deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting game:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete all games for a specific player
+app.delete('/api/players/:id/games', (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log('Deleting all games for player:', id);
+
+    // Get all game IDs for this player
+    const games = db.prepare(`
+      SELECT DISTINCT g.id
+      FROM games g
+      JOIN game_players gp ON g.id = gp.game_id
+      WHERE gp.player_id = ?
+    `).all(id);
+
+    if (games.length === 0) {
+      return res.json({ success: true, message: 'No games to delete', deleted: 0 });
+    }
+
+    // Delete all games (cascade will handle related records)
+    const stmt = db.prepare('DELETE FROM games WHERE id = ?');
+    const transaction = db.transaction((gameIds) => {
+      gameIds.forEach(gameId => {
+        stmt.run(gameId);
+      });
+    });
+
+    transaction(games.map(g => g.id));
+
+    console.log('All games deleted for player:', id, 'Count:', games.length);
+    res.json({ success: true, message: 'All games deleted successfully', deleted: games.length });
+  } catch (error) {
+    console.error('Error deleting all games:', error);
     res.status(500).json({ error: error.message });
   }
 });

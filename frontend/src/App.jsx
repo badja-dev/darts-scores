@@ -35,8 +35,8 @@ function App() {
 
   // Players state
   const [players, setPlayers] = useState([
-    { id: 1, name: 'Player 1', score: 501 },
-    { id: 2, name: 'Player 2', score: 501 },
+    { id: 1, name: 'Player 1', score: 501, legsWon: 0 },
+    { id: 2, name: 'Player 2', score: 501, legsWon: 0 },
   ]);
   const [currentPlayerIndex, setCurrentPlayerIndex] = useState(0);
 
@@ -49,26 +49,64 @@ function App() {
   // Suggested checkout
   const [suggestedCheckout, setSuggestedCheckout] = useState(null);
 
+  // Easter eggs
+  const [showNice, setShowNice] = useState(false);
+  const [showBlazeIt, setShowBlazeIt] = useState(false);
+
   // Update checkout suggestion when current player's score changes
   useEffect(() => {
     const currentPlayer = players[currentPlayerIndex];
-    if (currentPlayer) {
+    const isEndlessMode = gameType === 'Endless';
+    if (currentPlayer && !isEndlessMode) {
       const suggestion = getCheckoutSuggestion(currentPlayer.score);
       setSuggestedCheckout(suggestion);
+    } else {
+      setSuggestedCheckout(null);
     }
-  }, [players, currentPlayerIndex]);
+  }, [players, currentPlayerIndex, gameType]);
 
   // Handle score selection from dartboard
   const handleScoreSelect = (score, multiplier) => {
     if (currentDarts.length >= 3 || gameComplete) return;
 
+    // Clear easter eggs when starting a new turn
+    if (showNice) {
+      setShowNice(false);
+    }
+    if (showBlazeIt && currentDarts.length === 0) {
+      // Only clear blaze it when starting a fresh turn (not adding to existing darts)
+      setShowBlazeIt(false);
+    }
+
     const totalScore = score * multiplier;
     const newDarts = [...currentDarts, { score: totalScore, multiplier }];
     setCurrentDarts(newDarts);
 
+    // Easter egg: Check if turn total equals 69
+    const turnTotal = newDarts.reduce((sum, dart) => sum + dart.score, 0);
+    if (turnTotal === 69) {
+      setShowNice(true);
+    }
+
     // Update score immediately
     const currentPlayer = players[currentPlayerIndex];
-    const newScore = currentPlayer.score - totalScore;
+    const isEndlessMode = gameType === 'Endless';
+    const newScore = isEndlessMode
+      ? currentPlayer.score + totalScore
+      : currentPlayer.score - totalScore;
+
+    // Easter egg: Check if score is 420
+    if (newScore === 420) {
+      setShowBlazeIt(true);
+    } else if (showBlazeIt) {
+      setShowBlazeIt(false);
+    }
+
+    // Skip win/bust checks for endless mode
+    if (isEndlessMode) {
+      updatePlayerScore(totalScore, isEndlessMode);
+      return;
+    }
 
     // Check for exact finish with double (Double Out rule) or Straight Out
     const isWin = gameFormat === 'Double Out'
@@ -76,25 +114,66 @@ function App() {
       : (newScore === 0);
 
     if (isWin) {
-      // Winner! Update score and mark game complete
+      // Leg won! Update score and handle leg/game completion
       updatePlayerScore(totalScore);
 
-      // Complete the leg in database
-      const handleWin = async () => {
+      // Complete the leg in database and handle progression
+      const handleLegWin = async () => {
         try {
           const dbPlayerId = dbPlayerIds[currentPlayer.id];
           await completeLeg(legId, dbPlayerId);
           console.log('Leg completed in database');
+
+          // Update leg wins for the winner
+          const updatedPlayers = players.map(p =>
+            p.id === currentPlayer.id ? { ...p, legsWon: p.legsWon + 1 } : p
+          );
+
+          const winner = updatedPlayers.find(p => p.id === currentPlayer.id);
+          const legsNeededToWin = Math.ceil(totalLegs / 2);
+
+          // Check if game is won (won enough legs)
+          if (winner.legsWon >= legsNeededToWin) {
+            setPlayers(updatedPlayers);
+            setTimeout(() => {
+              // Handle solo vs 2-player win messages
+              if (players.length === 1) {
+                alert(`${currentPlayer.name} completes the game!`);
+              } else {
+                const opponent = updatedPlayers.find(p => p.id !== currentPlayer.id);
+                alert(`${currentPlayer.name} wins the game ${winner.legsWon}-${opponent.legsWon}!`);
+              }
+              setGameComplete(true);
+            }, 300);
+          } else {
+            // Game continues - start next leg
+            setTimeout(async () => {
+              alert(`${currentPlayer.name} wins leg ${currentLeg}!`);
+
+              // Update players with leg win and reset scores
+              const startingScore = parseInt(gameType);
+              setPlayers(updatedPlayers.map(p => ({ ...p, score: startingScore })));
+
+              // Create new leg in database
+              const newLegNumber = currentLeg + 1;
+              const newLeg = await createLeg(gameId, newLegNumber);
+              setLegId(newLeg.id);
+              setCurrentLeg(newLegNumber);
+
+              // Reset turn state
+              setCurrentDarts([]);
+              setThrowHistory([]);
+              setCurrentPlayerIndex(0);
+
+              console.log('New leg started:', newLegNumber);
+            }, 300);
+          }
         } catch (error) {
-          console.error('Failed to complete leg:', error);
+          console.error('Failed to handle leg win:', error);
+          alert('Error processing leg win. Please try again.');
         }
       };
-      handleWin();
-
-      setTimeout(() => {
-        alert(`${currentPlayer.name} wins!`);
-        setGameComplete(true);
-      }, 300);
+      handleLegWin();
       return;
     }
 
@@ -112,11 +191,11 @@ function App() {
   };
 
   // Update player score
-  const updatePlayerScore = (dartScore) => {
+  const updatePlayerScore = (dartScore, isEndless = false) => {
     setPlayers((prevPlayers) =>
       prevPlayers.map((player, index) =>
         index === currentPlayerIndex
-          ? { ...player, score: player.score - dartScore }
+          ? { ...player, score: isEndless ? player.score + dartScore : player.score - dartScore }
           : player
       )
     );
@@ -125,6 +204,14 @@ function App() {
   // Complete turn - add to history, save to database, and move to next player
   const handleCompleteTurn = async () => {
     if (currentDarts.length === 0 || gameComplete) return;
+
+    // Clear easter eggs when turn is completed
+    if (showNice) {
+      setShowNice(false);
+    }
+    if (showBlazeIt) {
+      setShowBlazeIt(false);
+    }
 
     const currentPlayer = players[currentPlayerIndex];
     const currentScore = currentPlayer.score;
@@ -178,52 +265,76 @@ function App() {
   const handleUndo = () => {
     if (currentDarts.length > 0) {
       const lastDart = currentDarts[currentDarts.length - 1];
-      // Restore the score
+      const isEndlessMode = gameType === 'Endless';
+      const currentPlayer = players[currentPlayerIndex];
+      const restoredScore = isEndlessMode ? currentPlayer.score - lastDart.score : currentPlayer.score + lastDart.score;
+
+      // Restore the score (reverse the operation)
       setPlayers((prevPlayers) =>
         prevPlayers.map((player, index) =>
           index === currentPlayerIndex
-            ? { ...player, score: player.score + lastDart.score }
+            ? { ...player, score: restoredScore }
             : player
         )
       );
       // Remove the dart
-      setCurrentDarts((prev) => prev.slice(0, -1));
+      const newDarts = currentDarts.slice(0, -1);
+      setCurrentDarts(newDarts);
+
+      // Check if we should still show "nice" after undo
+      const turnTotal = newDarts.reduce((sum, dart) => sum + dart.score, 0);
+      if (turnTotal !== 69) {
+        setShowNice(false);
+      }
+
+      // Check if we should still show "blaze it" after undo
+      if (restoredScore !== 420) {
+        setShowBlazeIt(false);
+      }
     }
   };
 
   // Reset current turn - restore all scores from this turn
   const handleReset = () => {
     if (currentDarts.length > 0) {
+      const isEndlessMode = gameType === 'Endless';
       const totalToRestore = currentDarts.reduce((sum, dart) => sum + dart.score, 0);
       setPlayers((prevPlayers) =>
         prevPlayers.map((player, index) =>
           index === currentPlayerIndex
-            ? { ...player, score: player.score + totalToRestore }
+            ? { ...player, score: isEndlessMode ? player.score - totalToRestore : player.score + totalToRestore }
             : player
         )
       );
     }
     setCurrentDarts([]);
+    setShowNice(false);
+    setShowBlazeIt(false);
   };
 
   // Handle game start
-  const handleStartGame = async ({ players: newPlayers, gameType: newGameType, format: newFormat }) => {
+  const handleStartGame = async ({ players: newPlayers, gameType: newGameType, format: newFormat, numberOfLegs, gameMode }) => {
     try {
-      const startingScore = parseInt(newGameType);
+      const isEndlessMode = newGameType === 'Endless';
+      const startingScore = isEndlessMode ? 0 : parseInt(newGameType);
+      const isSoloMode = gameMode === 'solo';
 
       // Create or get players from database
       const dbPlayer1 = await getOrCreatePlayer(newPlayers[0].name);
-      const dbPlayer2 = await getOrCreatePlayer(newPlayers[1].name);
+      const dbPlayer2 = isSoloMode ? null : await getOrCreatePlayer(newPlayers[1].name);
 
       // Map local player IDs to database IDs
       const playerIdMap = {
         [newPlayers[0].id]: dbPlayer1.id,
-        [newPlayers[1].id]: dbPlayer2.id,
       };
+      if (!isSoloMode) {
+        playerIdMap[newPlayers[1].id] = dbPlayer2.id;
+      }
       setDbPlayerIds(playerIdMap);
 
       // Create game in database
-      const game = await createGame(newGameType, newFormat, [dbPlayer1.id, dbPlayer2.id]);
+      const playerIds = isSoloMode ? [dbPlayer1.id] : [dbPlayer1.id, dbPlayer2.id];
+      const game = await createGame(newGameType, newFormat, playerIds);
       setGameId(game.id);
 
       // Create first leg
@@ -231,12 +342,15 @@ function App() {
       setLegId(leg.id);
 
       // Set up frontend state
-      setPlayers(newPlayers.map(p => ({ ...p, score: startingScore })));
+      setPlayers(newPlayers.map(p => ({ ...p, score: startingScore, legsWon: 0 })));
       setGameType(newGameType);
       setGameFormat(newFormat);
+      // Solo mode and Endless mode always single leg
+      setTotalLegs(isSoloMode || isEndlessMode ? 1 : numberOfLegs);
+      setCurrentLeg(1);
       setGameStarted(true);
 
-      console.log('Game created:', { game, leg, playerIdMap });
+      console.log('Game created:', { game, leg, playerIdMap, numberOfLegs, gameMode });
     } catch (error) {
       console.error('Failed to start game:', error);
       alert('Failed to start game. Please try again.');
@@ -267,39 +381,81 @@ function App() {
                 Darts Scores
               </h1>
               <p className="text-sm text-gray-400 mt-0.5">
-                {gameType} • {gameFormat}
+                {gameType === 'Endless'
+                  ? 'Endless Mode'
+                  : `${gameType} • ${gameFormat} • ${totalLegs === 1 ? 'Single Leg' : `Best of ${totalLegs}`}`
+                }
               </p>
             </div>
           </div>
 
-          <button
-            onClick={() => {
-              if (confirm('Start a new game? All data will be cleared.')) {
+          {gameComplete ? (
+            <button
+              onClick={() => {
                 setGameStarted(false);
                 setGameComplete(false);
                 setThrowHistory([]);
                 setCurrentDarts([]);
                 setCurrentPlayerIndex(0);
-              }
-            }}
-            className="px-4 py-2 rounded-lg font-semibold transition-all hover:opacity-90 flex items-center gap-2"
-            style={{ backgroundColor: '#4a4a4a', color: 'white' }}
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+              }}
+              className="px-4 py-2 rounded-lg font-semibold transition-all hover:opacity-90 flex items-center gap-2"
+              style={{ backgroundColor: '#a3e635', color: '#0a0e1a' }}
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 4v16m8-8H4"
-              />
-            </svg>
-            New Game
-          </button>
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                />
+              </svg>
+              Back to Menu
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                const isEndlessMode = gameType === 'Endless';
+                if (isEndlessMode) {
+                  // For endless mode, just end the game and show stats
+                  if (confirm('End this game and view statistics?')) {
+                    setGameComplete(true);
+                    setActiveTab('stats'); // Switch to stats tab
+                  }
+                } else {
+                  // For regular games, reset everything
+                  if (confirm('Start a new game? All data will be cleared.')) {
+                    setGameStarted(false);
+                    setGameComplete(false);
+                    setThrowHistory([]);
+                    setCurrentDarts([]);
+                    setCurrentPlayerIndex(0);
+                  }
+                }
+              }}
+              className="px-4 py-2 rounded-lg font-semibold transition-all hover:opacity-90 flex items-center gap-2"
+              style={{ backgroundColor: '#4a4a4a', color: 'white' }}
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d={gameType === 'Endless' ? "M6 18L18 6M6 6l12 12" : "M12 4v16m8-8H4"}
+                />
+              </svg>
+              {gameType === 'Endless' ? 'End Game' : 'New Game'}
+            </button>
+          )}
         </div>
 
         {/* Game Info Bar */}
@@ -325,29 +481,31 @@ function App() {
                 />
               </svg>
               <span className="text-white font-semibold">
-                Format: <span style={{ color: '#a3e635' }}>Single Leg</span>
+                Mode: <span style={{ color: '#a3e635' }}>{players.length === 1 ? 'Solo Practice' : '2 Player'}</span>
               </span>
             </div>
 
-            <div className="flex items-center gap-2">
-              <svg
-                className="w-6 h-6"
-                style={{ color: '#a3e635' }}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              <span className="text-white font-semibold">
-                Current Leg: <span style={{ color: '#a3e635' }}>{currentLeg} of {totalLegs}</span>
-              </span>
-            </div>
+            {gameType !== 'Endless' && (
+              <div className="flex items-center gap-2">
+                <svg
+                  className="w-6 h-6"
+                  style={{ color: '#a3e635' }}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <span className="text-white font-semibold">
+                  Current Leg: <span style={{ color: '#a3e635' }}>{currentLeg} of {totalLegs}</span>
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -460,6 +618,22 @@ function App() {
             </div>
           </div>
         </div>
+
+        {/* Easter eggs */}
+        {(showNice || showBlazeIt) && (
+          <div className="mt-4 flex justify-center gap-4">
+            {showNice && (
+              <p className="text-sm" style={{ color: '#a3e635' }}>
+                nice
+              </p>
+            )}
+            {showBlazeIt && (
+              <p className="text-sm" style={{ color: '#a3e635' }}>
+                blaze it
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
