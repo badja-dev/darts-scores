@@ -1,0 +1,56 @@
+🎯 DARTS SCORES - QUICK START
+================================
+
+ABSOLUTE FASTEST WAY TO GET STARTED:
+
+1. Install Node.js from https://nodejs.org/ (click the big green "LTS" button)
+
+2. Get these files (you already have them if you're reading this!)
+
+3. WINDOWS USERS:
+   - Double-click: start-backend.bat
+   - Double-click: start-frontend.bat
+   - Open browser to: http://localhost:5173
+
+   MAC/LINUX USERS:
+   - Double-click: start-backend.sh
+   - Double-click: start-frontend.sh
+   - Open browser to: http://localhost:5173
+
+4. That's it! Start playing darts!
+
+================================
+
+FIRST TIME ONLY:
+- The scripts will automatically install everything needed
+- This takes about 1 minute
+- You need internet connection
+
+EVERY TIME AFTER:
+- Just double-click the two files
+- Wait for them to say "running"
+- Open browser to localhost:5173
+
+================================
+
+NEED MORE HELP?
+- Read SETUP_GUIDE.md for detailed step-by-step instructions
+- Read README.md for technical information
+
+================================
+
+TROUBLESHOOTING:
+- Make sure both windows stay open while playing
+- If it doesn't work, read the SETUP_GUIDE.md
+- Your game data is saved in backend/darts.db
+
+================================
+
+STOPPING THE APP:
+- Close the browser tab
+- Press Ctrl+C in both windows
+- Close both windows
+
+================================
+
+Have fun! 🎯

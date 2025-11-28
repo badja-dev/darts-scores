@@ -65,6 +65,10 @@ A professional, full-stack web application for tracking darts scores with persis
 
 ## 🚀 Quick Start
 
+**Complete Beginner?** Read **[SETUP_GUIDE.md](SETUP_GUIDE.md)** for detailed step-by-step instructions!
+
+**Want the fastest method?** See **[QUICK_START.txt](QUICK_START.txt)** - 4 steps to get playing!
+
 ### Prerequisites
 - [Node.js](https://nodejs.org/) 18.0 or higher
 - npm (comes with Node.js)
