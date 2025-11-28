@@ -14,7 +14,7 @@ const PlayersList = ({ players, currentPlayerId }) => {
               borderColor: player.id === currentPlayerId ? '#a3e635' : 'transparent',
             }}
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3 flex-1">
               <span className="text-gray-400">
                 <svg
                   className="w-5 h-5"
@@ -30,15 +30,24 @@ const PlayersList = ({ players, currentPlayerId }) => {
                   />
                 </svg>
               </span>
-              <span className="font-medium text-white">{player.name}</span>
-              {player.id === currentPlayerId && (
-                <span
-                  className="text-xs px-2 py-1 rounded-full font-semibold"
-                  style={{ backgroundColor: '#a3e635', color: '#0a0e1a' }}
-                >
-                  Current
-                </span>
-              )}
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-white">{player.name}</span>
+                  {player.id === currentPlayerId && (
+                    <span
+                      className="text-xs px-2 py-1 rounded-full font-semibold"
+                      style={{ backgroundColor: '#a3e635', color: '#0a0e1a' }}
+                    >
+                      Current
+                    </span>
+                  )}
+                </div>
+                {player.legsWon > 0 && (
+                  <div className="text-xs text-gray-400 mt-1">
+                    Legs won: {player.legsWon}
+                  </div>
+                )}
+              </div>
             </div>
             <div className="text-2xl font-bold text-white">{player.score}</div>
           </div>

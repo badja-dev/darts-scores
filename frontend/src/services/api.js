@@ -108,3 +108,28 @@ export const getPlayerGames = async (playerId) => {
   if (!response.ok) throw new Error('Failed to fetch player games');
   return response.json();
 };
+
+// Get statistics for a specific leg and player
+export const getLegPlayerStatistics = async (legId, playerId) => {
+  const response = await fetch(`${API_BASE_URL}/legs/${legId}/players/${playerId}/statistics`);
+  if (!response.ok) throw new Error('Failed to fetch leg statistics');
+  return response.json();
+};
+
+// Delete a specific game
+export const deleteGame = async (gameId) => {
+  const response = await fetch(`${API_BASE_URL}/games/${gameId}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) throw new Error('Failed to delete game');
+  return response.json();
+};
+
+// Delete all games for a player
+export const deleteAllPlayerGames = async (playerId) => {
+  const response = await fetch(`${API_BASE_URL}/players/${playerId}/games`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) throw new Error('Failed to delete all games');
+  return response.json();
+};
