@@ -17,19 +17,22 @@ const Statistics = ({ throwHistory, players, gameComplete }) => {
     const totalScore = playerThrows.reduce((sum, t) => sum + t.score, 0);
     const doubles = playerThrows.filter(t => t.multiplier === 2).length;
     const triples = playerThrows.filter(t => t.multiplier === 3).length;
-    const highestScore = Math.max(...playerThrows.map(t => t.score));
 
-    // Calculate 3-dart average
-    const turns = [];
-    for (let i = 0; i < playerThrows.length; i += 3) {
-      const turn = playerThrows.slice(i, i + 3);
-      if (turn.length > 0) {
-        turns.push(turn.reduce((sum, t) => sum + t.score, 0));
+    // Calculate 3-dart average by grouping by throw number
+    const turnMap = new Map();
+    playerThrows.forEach(dart => {
+      const throwNum = dart.throwNumber || 1;
+      if (!turnMap.has(throwNum)) {
+        turnMap.set(throwNum, 0);
       }
-    }
+      turnMap.set(throwNum, turnMap.get(throwNum) + dart.score);
+    });
+
+    const turns = Array.from(turnMap.values());
     const threeDartAverage = turns.length > 0
       ? turns.reduce((sum, t) => sum + t, 0) / turns.length
       : 0;
+    const highestScore = turns.length > 0 ? Math.max(...turns) : 0;
 
     return {
       totalDarts: playerThrows.length,

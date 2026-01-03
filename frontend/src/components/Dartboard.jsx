@@ -113,7 +113,7 @@ const Dartboard = ({ onScoreSelect }) => {
       <button
         className="mt-4 px-6 py-2 rounded-lg font-semibold transition-colors"
         style={{ backgroundColor: '#4a4a4a', color: 'white' }}
-        onClick={() => handleSegmentClick(0, 0)}
+        onClick={() => handleSegmentClick(0, 1)}
       >
         MISS
       </button>

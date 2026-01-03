@@ -24,7 +24,7 @@ const Keypad = ({ onScoreSelect }) => {
     const score = parseInt(inputScore);
 
     // Validate score
-    if (score < 0 || score > 20 && score !== 25) {
+    if (score < 0 || (score > 20 && score !== 25)) {
       alert('Invalid score! Must be 0-20 or 25 (bull)');
       return;
     }
@@ -38,7 +38,7 @@ const Keypad = ({ onScoreSelect }) => {
   };
 
   const handleMiss = () => {
-    onScoreSelect(0, 0);
+    onScoreSelect(0, 1);
     setInputScore('');
     setSelectedMultiplier(1);
   };

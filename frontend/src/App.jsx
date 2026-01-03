@@ -114,13 +114,56 @@ function App() {
       : (newScore === 0);
 
     if (isWin) {
-      // Leg won! Update score and handle leg/game completion
+      // Leg won! Update score and record the winning throw
       updatePlayerScore(totalScore);
 
-      // Complete the leg in database and handle progression
+      // Record the winning throw to database and handle leg completion
       const handleLegWin = async () => {
         try {
           const dbPlayerId = dbPlayerIds[currentPlayer.id];
+
+          // Calculate throw number (count actual completed turns for this player)
+          const playerThrows = throwHistory.filter(t => t.playerId === currentPlayer.id);
+          let throwNumber = 1;
+          if (playerThrows.length > 0) {
+            // Find the highest throw number already recorded for this player
+            const throwNumbers = new Set();
+            let currentThrow = 1;
+            for (let i = 0; i < playerThrows.length; i++) {
+              throwNumbers.add(currentThrow);
+              // Every 3 darts (or less) is a new turn
+              if ((i + 1) % 3 === 0) {
+                currentThrow++;
+              }
+            }
+            throwNumber = throwNumbers.size + 1;
+          }
+
+          // Record each dart in the winning throw to database
+          for (let i = 0; i < newDarts.length; i++) {
+            const dart = newDarts[i];
+            await recordThrow(
+              legId,
+              dbPlayerId,
+              throwNumber,
+              i + 1, // dart_number (1, 2, or 3)
+              dart.score,
+              dart.multiplier,
+              dart.score === 0 // is_miss
+            );
+          }
+
+          // Add winning throw to history (frontend)
+          const historyDarts = newDarts.map((dart, index) => ({
+            ...dart,
+            playerId: currentPlayer.id,
+            throwNumber: throwNumber,
+            bust: false,
+            remainingScore: currentPlayer.score - newDarts.slice(0, index + 1).reduce((sum, d) => sum + d.score, 0)
+          }));
+          setThrowHistory(prev => [...prev, ...historyDarts]);
+
+          // Complete the leg in database
           await completeLeg(legId, dbPlayerId);
           console.log('Leg completed in database');
 
@@ -135,6 +178,7 @@ function App() {
           // Check if game is won (won enough legs)
           if (winner.legsWon >= legsNeededToWin) {
             setPlayers(updatedPlayers);
+            setCurrentDarts([]);
             setTimeout(() => {
               // Handle solo vs 2-player win messages
               if (players.length === 1) {
@@ -147,6 +191,7 @@ function App() {
             }, 300);
           } else {
             // Game continues - start next leg
+            setCurrentDarts([]);
             setTimeout(async () => {
               alert(`${currentPlayer.name} wins leg ${currentLeg}!`);
 
@@ -161,7 +206,6 @@ function App() {
               setCurrentLeg(newLegNumber);
 
               // Reset turn state
-              setCurrentDarts([]);
               setThrowHistory([]);
               setCurrentPlayerIndex(0);
 
@@ -179,9 +223,23 @@ function App() {
 
     // Check for bust (score would go below 0 or to exactly 1)
     if (newScore < 0 || newScore === 1) {
-      // Bust! Don't update score
+      // Bust! Restore score from this turn and move to next player
+      const totalToRestore = newDarts.reduce((sum, dart) => sum + dart.score, 0);
+      setPlayers((prevPlayers) =>
+        prevPlayers.map((player, index) =>
+          index === currentPlayerIndex
+            ? { ...player, score: player.score + totalToRestore }
+            : player
+        )
+      );
+
+      // Clear current darts
+      setCurrentDarts([]);
+
+      // Show bust alert and move to next player
       setTimeout(() => {
         alert(`${currentPlayer.name} BUST!`);
+        nextPlayer();
       }, 300);
       return;
     }
@@ -218,9 +276,22 @@ function App() {
     const dbPlayerId = dbPlayerIds[currentPlayer.id];
 
     try {
-      // Calculate throw number (how many turns this player has taken)
-      const playerTurns = throwHistory.filter(t => t.playerId === currentPlayer.id).length / 3;
-      const throwNumber = Math.floor(playerTurns) + 1;
+      // Calculate throw number (count actual completed turns for this player)
+      const playerThrows = throwHistory.filter(t => t.playerId === currentPlayer.id);
+      let throwNumber = 1;
+      if (playerThrows.length > 0) {
+        // Find the highest throw number already recorded for this player
+        const throwNumbers = new Set();
+        let currentThrow = 1;
+        for (let i = 0; i < playerThrows.length; i++) {
+          throwNumbers.add(currentThrow);
+          // Every 3 darts (or less) is a new turn
+          if ((i + 1) % 3 === 0) {
+            currentThrow++;
+          }
+        }
+        throwNumber = throwNumbers.size + 1;
+      }
 
       // Record each dart to database
       for (let i = 0; i < currentDarts.length; i++) {
@@ -240,6 +311,7 @@ function App() {
       const historyDarts = currentDarts.map((dart, index) => ({
         ...dart,
         playerId: currentPlayer.id,
+        throwNumber: throwNumber,
         bust: false,
         remainingScore: currentScore - currentDarts.slice(0, index + 1).reduce((sum, d) => sum + d.score, 0)
       }));
