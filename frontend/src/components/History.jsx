@@ -1,10 +1,19 @@
 const History = ({ throwHistory, players }) => {
-  // Group throws by turn (3 darts per turn)
+  // Group throws by player and throw number
   const groupedHistory = [];
-  for (let i = 0; i < throwHistory.length; i += 3) {
-    const turn = throwHistory.slice(i, Math.min(i + 3, throwHistory.length));
-    groupedHistory.push(turn);
-  }
+  const turnMap = new Map();
+
+  throwHistory.forEach(dart => {
+    const key = `${dart.playerId}-${dart.throwNumber}`;
+    if (!turnMap.has(key)) {
+      turnMap.set(key, []);
+    }
+    turnMap.get(key).push(dart);
+  });
+
+  // Convert map to array and sort by order they appeared
+  const turns = Array.from(turnMap.values());
+  turns.forEach(turn => groupedHistory.push(turn));
 
   const getPlayerName = (playerId) => {
     const player = players.find(p => p.id === playerId);

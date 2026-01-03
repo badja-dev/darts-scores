@@ -315,7 +315,6 @@ app.get('/api/legs/:legId/players/:playerId/statistics', (req, res) => {
     const totalScore = throws.reduce((sum, t) => sum + t.score, 0);
     const doubles = throws.filter(t => t.multiplier === 2).length;
     const triples = throws.filter(t => t.multiplier === 3).length;
-    const highestScore = Math.max(...throws.map(t => t.score));
 
     // Calculate 3-dart average by grouping by throw_number
     const turnScores = {};
@@ -327,6 +326,7 @@ app.get('/api/legs/:legId/players/:playerId/statistics', (req, res) => {
     });
 
     const turns = Object.values(turnScores);
+    const highestScore = turns.length > 0 ? Math.max(...turns) : 0;
     const threeDartAverage = turns.length > 0
       ? turns.reduce((sum, score) => sum + score, 0) / turns.length
       : 0;
