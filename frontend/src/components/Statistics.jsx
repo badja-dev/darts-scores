@@ -11,12 +11,16 @@ const Statistics = ({ throwHistory, players, gameComplete }) => {
         highestScore: 0,
         doubles: 0,
         triples: 0,
+        misses: 0,
+        turns: 0,
+        topSegments: [],
       };
     }
 
     const totalScore = playerThrows.reduce((sum, t) => sum + t.score, 0);
-    const doubles = playerThrows.filter(t => t.multiplier === 2).length;
-    const triples = playerThrows.filter(t => t.multiplier === 3).length;
+    const doubles = playerThrows.filter(t => t.multiplier === 2 && t.score > 0).length;
+    const triples = playerThrows.filter(t => t.multiplier === 3 && t.score > 0).length;
+    const misses = playerThrows.filter(t => t.score === 0).length;
 
     // Calculate 3-dart average by grouping by throw number
     const turnMap = new Map();
@@ -34,6 +38,21 @@ const Statistics = ({ throwHistory, players, gameComplete }) => {
       : 0;
     const highestScore = turns.length > 0 ? Math.max(...turns) : 0;
 
+    // Calculate segment breakdown (individual number hits with multipliers)
+    const segmentHits = {};
+    playerThrows.forEach(dart => {
+      if (dart.score === 0) return; // Skip misses
+      const baseScore = dart.score / dart.multiplier; // Get the original segment number
+      const key = `${dart.multiplier}x${baseScore}`;
+      segmentHits[key] = (segmentHits[key] || 0) + 1;
+    });
+
+    // Sort segments by hit count (descending) and take top 5
+    const topSegments = Object.entries(segmentHits)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([segment, count]) => ({ segment, count }));
+
     return {
       totalDarts: playerThrows.length,
       totalScore,
@@ -42,7 +61,9 @@ const Statistics = ({ throwHistory, players, gameComplete }) => {
       highestScore,
       doubles,
       triples,
+      misses,
       turns: turns.length,
+      topSegments,
     };
   };
 
@@ -155,7 +176,43 @@ const Statistics = ({ throwHistory, players, gameComplete }) => {
                   {stats.turns}
                 </p>
               </div>
+
+              <div className="p-4 rounded-lg" style={{ backgroundColor: '#1a1f2e' }}>
+                <p className="text-xs text-gray-400 mb-1">Misses</p>
+                <p className="text-2xl font-bold text-white">
+                  {stats.misses}
+                </p>
+              </div>
             </div>
+
+            {/* Top Segments Hit */}
+            {stats.topSegments && stats.topSegments.length > 0 && (
+              <div className="mt-6">
+                <h4 className="text-lg font-bold text-white mb-3">Top Segments Hit</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {stats.topSegments.map(({ segment, count }) => {
+                    const [multiplier, number] = segment.split('x');
+                    let label = '';
+                    if (multiplier === '3') label = `Triple ${number}`;
+                    else if (multiplier === '2') label = `Double ${number}`;
+                    else label = `Single ${number}`;
+
+                    return (
+                      <div
+                        key={segment}
+                        className="p-3 rounded-lg flex justify-between items-center"
+                        style={{ backgroundColor: '#1a1f2e' }}
+                      >
+                        <span className="text-white font-semibold">{label}</span>
+                        <span className="text-lg font-bold" style={{ color: '#a3e635' }}>
+                          {count}x
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         );
       })}

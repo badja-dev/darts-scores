@@ -42,6 +42,7 @@ function App() {
 
   // Current turn state
   const [currentDarts, setCurrentDarts] = useState([]);
+  const [turnStartScore, setTurnStartScore] = useState(null); // Track score at start of turn for bust restoration
 
   // Throw history
   const [throwHistory, setThrowHistory] = useState([]);
@@ -52,6 +53,31 @@ function App() {
   // Easter eggs
   const [showNice, setShowNice] = useState(false);
   const [showBlazeIt, setShowBlazeIt] = useState(false);
+
+  // Save game state to localStorage whenever it changes
+  useEffect(() => {
+    if (gameStarted && !gameComplete) {
+      const gameState = {
+        gameId,
+        legId,
+        dbPlayerIds,
+        gameType,
+        gameFormat,
+        currentLeg,
+        totalLegs,
+        players,
+        currentPlayerIndex,
+        currentDarts,
+        turnStartScore,
+        throwHistory,
+        timestamp: Date.now(),
+      };
+      localStorage.setItem('dartsGameState', JSON.stringify(gameState));
+    } else if (gameComplete) {
+      // Clear saved game when complete
+      localStorage.removeItem('dartsGameState');
+    }
+  }, [gameStarted, gameComplete, gameId, legId, dbPlayerIds, gameType, gameFormat, currentLeg, totalLegs, players, currentPlayerIndex, currentDarts, turnStartScore, throwHistory]);
 
   // Update checkout suggestion when current player's score changes
   useEffect(() => {
@@ -78,6 +104,13 @@ function App() {
       setShowBlazeIt(false);
     }
 
+    const currentPlayer = players[currentPlayerIndex];
+
+    // Capture the score at the start of the turn (before any darts are thrown)
+    if (currentDarts.length === 0) {
+      setTurnStartScore(currentPlayer.score);
+    }
+
     const totalScore = score * multiplier;
     const newDarts = [...currentDarts, { score: totalScore, multiplier }];
     setCurrentDarts(newDarts);
@@ -89,7 +122,6 @@ function App() {
     }
 
     // Update score immediately
-    const currentPlayer = players[currentPlayerIndex];
     const isEndlessMode = gameType === 'Endless';
     const newScore = isEndlessMode
       ? currentPlayer.score + totalScore
@@ -179,6 +211,7 @@ function App() {
           if (winner.legsWon >= legsNeededToWin) {
             setPlayers(updatedPlayers);
             setCurrentDarts([]);
+            setTurnStartScore(null);
             setTimeout(() => {
               // Handle solo vs 2-player win messages
               if (players.length === 1) {
@@ -192,6 +225,7 @@ function App() {
           } else {
             // Game continues - start next leg
             setCurrentDarts([]);
+            setTurnStartScore(null);
             setTimeout(async () => {
               alert(`${currentPlayer.name} wins leg ${currentLeg}!`);
 
@@ -223,18 +257,18 @@ function App() {
 
     // Check for bust (score would go below 0 or to exactly 1)
     if (newScore < 0 || newScore === 1) {
-      // Bust! Restore score from this turn and move to next player
-      const totalToRestore = newDarts.reduce((sum, dart) => sum + dart.score, 0);
+      // Bust! Restore score to what it was at the start of this turn
       setPlayers((prevPlayers) =>
         prevPlayers.map((player, index) =>
           index === currentPlayerIndex
-            ? { ...player, score: player.score + totalToRestore }
+            ? { ...player, score: turnStartScore }
             : player
         )
       );
 
-      // Clear current darts
+      // Clear current darts and reset turn start score
       setCurrentDarts([]);
+      setTurnStartScore(null);
 
       // Show bust alert and move to next player
       setTimeout(() => {
@@ -317,8 +351,9 @@ function App() {
       }));
       setThrowHistory(prev => [...prev, ...historyDarts]);
 
-      // Clear current darts and move to next player
+      // Clear current darts and reset turn start score, then move to next player
       setCurrentDarts([]);
+      setTurnStartScore(null);
       nextPlayer();
 
       console.log('Turn saved to database');
@@ -353,6 +388,11 @@ function App() {
       const newDarts = currentDarts.slice(0, -1);
       setCurrentDarts(newDarts);
 
+      // If no darts left, clear turn start score
+      if (newDarts.length === 0) {
+        setTurnStartScore(null);
+      }
+
       // Check if we should still show "nice" after undo
       const turnTotal = newDarts.reduce((sum, dart) => sum + dart.score, 0);
       if (turnTotal !== 69) {
@@ -368,18 +408,18 @@ function App() {
 
   // Reset current turn - restore all scores from this turn
   const handleReset = () => {
-    if (currentDarts.length > 0) {
-      const isEndlessMode = gameType === 'Endless';
-      const totalToRestore = currentDarts.reduce((sum, dart) => sum + dart.score, 0);
+    if (currentDarts.length > 0 && turnStartScore !== null) {
+      // Restore score to what it was at the start of the turn
       setPlayers((prevPlayers) =>
         prevPlayers.map((player, index) =>
           index === currentPlayerIndex
-            ? { ...player, score: isEndlessMode ? player.score - totalToRestore : player.score + totalToRestore }
+            ? { ...player, score: turnStartScore }
             : player
         )
       );
     }
     setCurrentDarts([]);
+    setTurnStartScore(null);
     setShowNice(false);
     setShowBlazeIt(false);
   };
@@ -429,6 +469,37 @@ function App() {
     }
   };
 
+  // Handle resuming saved game
+  const handleResumeGame = () => {
+    try {
+      const savedState = localStorage.getItem('dartsGameState');
+      if (!savedState) return false;
+
+      const gameState = JSON.parse(savedState);
+
+      // Restore all state
+      setGameId(gameState.gameId);
+      setLegId(gameState.legId);
+      setDbPlayerIds(gameState.dbPlayerIds);
+      setGameType(gameState.gameType);
+      setGameFormat(gameState.gameFormat);
+      setCurrentLeg(gameState.currentLeg);
+      setTotalLegs(gameState.totalLegs);
+      setPlayers(gameState.players);
+      setCurrentPlayerIndex(gameState.currentPlayerIndex);
+      setCurrentDarts(gameState.currentDarts);
+      setTurnStartScore(gameState.turnStartScore);
+      setThrowHistory(gameState.throwHistory);
+      setGameStarted(true);
+
+      return true;
+    } catch (error) {
+      console.error('Failed to resume game:', error);
+      localStorage.removeItem('dartsGameState');
+      return false;
+    }
+  };
+
   // Show different views based on state
   if (view === 'history') {
     return <PlayerHistory onBack={() => setView('setup')} />;
@@ -436,7 +507,7 @@ function App() {
 
   // Show setup screen if game hasn't started
   if (!gameStarted) {
-    return <GameSetup onStartGame={handleStartGame} onViewHistory={() => setView('history')} />;
+    return <GameSetup onStartGame={handleStartGame} onViewHistory={() => setView('history')} onResumeGame={handleResumeGame} />;
   }
 
   return (
