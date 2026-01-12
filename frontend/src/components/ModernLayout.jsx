@@ -28,7 +28,16 @@ const ModernLayout = ({
         threeDartAverage: 0,
         oneDartAverage: 0,
         turnScores: [],
-        amountBreakdown: {},
+        amountBreakdown: {
+          '180s': 0,
+          '160-179': 0,
+          '140-159': 0,
+          '120-139': 0,
+          '100-119': 0,
+          '80-99': 0,
+          '60-79': 0,
+          '0-59': 0,
+        },
         topSegments: [],
       };
     }
@@ -122,33 +131,54 @@ const ModernLayout = ({
     <div className="min-h-screen p-4" style={{ backgroundColor: '#1e3a5f' }}>
       <div className="max-w-[1600px] mx-auto">
         {/* Top Score Display */}
-        <div className="rounded-lg mb-6 relative" style={{ backgroundColor: '#2c4f7c' }}>
+        <div className="rounded-lg mb-6" style={{ backgroundColor: '#2c4f7c' }}>
           <div className="text-center py-2 text-sm font-semibold" style={{ color: '#fff' }}>
             {gameType !== 'Endless' && totalLegs > 1 && `BEST OF ${totalLegs} LEGS`}
           </div>
-          <div className="grid grid-cols-2 divide-x relative" style={{ borderColor: '#1e3a5f' }}>
-            {/* Player 1 Score */}
-            <div className="p-6 text-center">
-              <div className="text-8xl font-bold text-white mb-2">
-                {player1?.score}
-              </div>
-              <div className="text-xl font-semibold text-white mb-1">
-                {player1?.name}
-                {currentPlayerIndex === 0 && (
-                  <>
-                    <span className="inline-block w-3 h-3 rounded-full bg-green-400 ml-2"></span>
-                    <span className="inline-block w-3 h-3 rounded-full bg-green-400 ml-1"></span>
-                  </>
-                )}
-              </div>
-              {suggestedCheckout && currentPlayerIndex === 0 && (
-                <div className="text-sm text-gray-300">{suggestedCheckout}</div>
-              )}
-            </div>
+          {player2 ? (
+            <div className="relative">
+              <div className="grid grid-cols-2 divide-x" style={{ borderColor: '#1e3a5f' }}>
+                {/* Player 1 Score */}
+                <div className="p-6 text-center">
+                  <div className="text-8xl font-bold text-white mb-2">
+                    {player1?.score}
+                  </div>
+                  <div className="text-xl font-semibold text-white mb-1">
+                    {player1?.name}
+                    {currentPlayerIndex === 0 && (
+                      <>
+                        <span className="inline-block w-3 h-3 rounded-full bg-green-400 ml-2"></span>
+                        <span className="inline-block w-3 h-3 rounded-full bg-green-400 ml-1"></span>
+                      </>
+                    )}
+                  </div>
+                  {suggestedCheckout && currentPlayerIndex === 0 && (
+                    <div className="text-sm text-gray-300">{suggestedCheckout}</div>
+                  )}
+                </div>
 
-            {/* Legs Display (Center) */}
-            {player2 && (
-              <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center text-white">
+                {/* Player 2 Score */}
+                <div className="p-6 text-center">
+                  <div className="text-8xl font-bold text-white mb-2">
+                    {player2.score}
+                  </div>
+                  <div className="text-xl font-semibold text-white mb-1">
+                    {player2.name}
+                    {currentPlayerIndex === 1 && (
+                      <>
+                        <span className="inline-block w-3 h-3 rounded-full bg-green-400 ml-2"></span>
+                        <span className="inline-block w-3 h-3 rounded-full bg-green-400 ml-1"></span>
+                      </>
+                    )}
+                  </div>
+                  {suggestedCheckout && currentPlayerIndex === 1 && (
+                    <div className="text-sm text-gray-300">{suggestedCheckout}</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Legs Display (Center Overlay) */}
+              <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center text-white pointer-events-none">
                 <div className="text-xs mb-2">LEGS</div>
                 <div className="flex gap-4 text-2xl font-bold">
                   <div>{player1?.legsWon || 0}</div>
@@ -156,35 +186,31 @@ const ModernLayout = ({
                   <div>{player2?.legsWon || 0}</div>
                 </div>
               </div>
-            )}
-
-            {/* Player 2 Score */}
-            {player2 && (
-              <div className="p-6 text-center">
-                <div className="text-8xl font-bold text-white mb-2">
-                  {player2.score}
-                </div>
-                <div className="text-xl font-semibold text-white mb-1">
-                  {player2.name}
-                  {currentPlayerIndex === 1 && (
-                    <>
-                      <span className="inline-block w-3 h-3 rounded-full bg-green-400 ml-2"></span>
-                      <span className="inline-block w-3 h-3 rounded-full bg-green-400 ml-1"></span>
-                    </>
-                  )}
-                </div>
-                {suggestedCheckout && currentPlayerIndex === 1 && (
-                  <div className="text-sm text-gray-300">{suggestedCheckout}</div>
-                )}
+            </div>
+          ) : (
+            /* Solo Mode - Single Player */
+            <div className="p-6 text-center">
+              <div className="text-8xl font-bold text-white mb-2">
+                {player1?.score}
               </div>
-            )}
-          </div>
+              <div className="text-xl font-semibold text-white mb-1">
+                {player1?.name}
+                <>
+                  <span className="inline-block w-3 h-3 rounded-full bg-green-400 ml-2"></span>
+                  <span className="inline-block w-3 h-3 rounded-full bg-green-400 ml-1"></span>
+                </>
+              </div>
+              {suggestedCheckout && (
+                <div className="text-sm text-gray-300">{suggestedCheckout}</div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        <div className={`grid grid-cols-1 ${player2 ? 'lg:grid-cols-12' : 'lg:grid-cols-9'} gap-4`}>
           {/* Left Sidebar - Player 1 Stats */}
-          <div className="lg:col-span-3 space-y-4">
+          <div className={`${player2 ? 'lg:col-span-3' : 'lg:col-span-2'} space-y-4`}>
             <div className="rounded-lg p-4" style={{ backgroundColor: '#2c4f7c' }}>
               <h3 className="text-lg font-bold text-white mb-3">GAME AVERAGES</h3>
               <div className="space-y-2 text-white">
@@ -234,18 +260,19 @@ const ModernLayout = ({
           </div>
 
           {/* Center Column - History & Input */}
-          <div className="lg:col-span-6 space-y-4">
+          <div className={`${player2 ? 'lg:col-span-6' : 'lg:col-span-7'} space-y-4`}>
             {/* Score History */}
             <div className="rounded-lg p-4 max-h-[400px] overflow-y-auto" style={{ backgroundColor: '#2c4f7c' }}>
               <h3 className="text-lg font-bold text-white mb-4">SCORE HISTORY</h3>
               <div className="space-y-3">
                 {turnHistory.slice().reverse().map((turn, index) => {
                   const player = players.find(p => p.id === turn.playerId);
+                  const isBust = turn.darts.some(dart => dart.bust);
                   return (
                     <div
-                      key={index}
+                      key={`${turn.playerId}-${turn.darts[0]?.throwNumber || index}`}
                       className="flex items-center justify-between p-3 rounded"
-                      style={{ backgroundColor: '#1e3a5f' }}
+                      style={{ backgroundColor: isBust ? '#5c1f1f' : '#1e3a5f' }}
                     >
                       <div className="text-white text-sm font-semibold w-20">
                         {player?.name}
@@ -254,7 +281,7 @@ const ModernLayout = ({
                         {turn.darts.map((dart, i) => formatDart(dart)).join(', ')}
                       </div>
                       <div className="text-2xl font-bold text-white w-20 text-right">
-                        {turn.total}
+                        {isBust ? <span className="text-red-400">BUST</span> : turn.total}
                       </div>
                     </div>
                   );
