@@ -8,6 +8,7 @@ import History from './components/History';
 import Statistics from './components/Statistics';
 import GameSetup from './components/GameSetup';
 import PlayerHistory from './components/PlayerHistory';
+import ModernLayout from './components/ModernLayout';
 import { getCheckoutSuggestion } from './utils/checkouts';
 import { getOrCreatePlayer, createGame, createLeg, recordThrow, completeLeg } from './services/api';
 
@@ -32,6 +33,7 @@ function App() {
 
   // UI state
   const [activeTab, setActiveTab] = useState('dartboard'); // 'dartboard', 'keypad', 'table', 'history', 'stats'
+  const [layoutMode, setLayoutMode] = useState('classic'); // 'classic' or 'modern'
 
   // Players state
   const [players, setPlayers] = useState([
@@ -71,6 +73,7 @@ function App() {
         turnStartScore,
         throwHistory,
         activeTab,
+        layoutMode,
         timestamp: Date.now(),
       };
       localStorage.setItem('dartsGameState', JSON.stringify(gameState));
@@ -78,7 +81,7 @@ function App() {
       // Clear saved game when complete
       localStorage.removeItem('dartsGameState');
     }
-  }, [gameStarted, gameComplete, gameId, legId, dbPlayerIds, gameType, gameFormat, currentLeg, totalLegs, players, currentPlayerIndex, currentDarts, turnStartScore, throwHistory, activeTab]);
+  }, [gameStarted, gameComplete, gameId, legId, dbPlayerIds, gameType, gameFormat, currentLeg, totalLegs, players, currentPlayerIndex, currentDarts, turnStartScore, throwHistory, activeTab, layoutMode]);
 
   // Update checkout suggestion when current player's score changes
   useEffect(() => {
@@ -494,6 +497,7 @@ function App() {
       setTurnStartScore(gameState.turnStartScore);
       setThrowHistory(gameState.throwHistory);
       setActiveTab(gameState.activeTab || 'dartboard');
+      setLayoutMode(gameState.layoutMode || 'classic');
       setGameStarted(true);
 
       return true;
@@ -515,9 +519,10 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen p-4 md:p-8" style={{ backgroundColor: '#0a0e1a' }}>
+    <div className="min-h-screen p-4 md:p-8" style={{ backgroundColor: layoutMode === 'modern' ? '#1e3a5f' : '#0a0e1a' }}>
       <div className="max-w-7xl mx-auto">
         {/* Header */}
+        {layoutMode === 'classic' && (
         <div
           className="rounded-lg p-4 mb-6 flex flex-wrap items-center justify-between gap-4"
           style={{ backgroundColor: '#1a1f2e' }}
@@ -604,8 +609,27 @@ function App() {
             </button>
           )}
         </div>
+        )}
+
+        {/* Toggle Button (shown in both layouts) */}
+        <div className="mb-6 flex justify-end">
+          <button
+            onClick={() => setLayoutMode(layoutMode === 'classic' ? 'modern' : 'classic')}
+            className="px-4 py-2 rounded-lg font-semibold transition-all hover:opacity-80 flex items-center gap-2"
+            style={{
+              backgroundColor: layoutMode === 'modern' ? '#a3e635' : '#4a4a4a',
+              color: layoutMode === 'modern' ? '#0a0e1a' : 'white',
+            }}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+            </svg>
+            {layoutMode === 'classic' ? 'Modern View' : 'Classic View'}
+          </button>
+        </div>
 
         {/* Game Info Bar */}
+        {layoutMode === 'classic' && (
         <div
           className="rounded-lg p-3 mb-6 flex flex-wrap items-center gap-6"
           style={{ backgroundColor: '#0f1419' }}
@@ -655,9 +679,29 @@ function App() {
             )}
           </div>
         </div>
+        )}
 
         {/* Main game area */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {layoutMode === 'modern' ? (
+          <ModernLayout
+            players={players}
+            currentPlayerIndex={currentPlayerIndex}
+            currentDarts={currentDarts}
+            throwHistory={throwHistory}
+            suggestedCheckout={suggestedCheckout}
+            gameComplete={gameComplete}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            onScoreSelect={handleScoreSelect}
+            onUndo={handleUndo}
+            onReset={handleReset}
+            onCompleteTurn={handleCompleteTurn}
+            gameType={gameType}
+            currentLeg={currentLeg}
+            totalLegs={totalLegs}
+          />
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left sidebar - Players */}
           <div className="space-y-6">
             <PlayersList players={players} currentPlayerId={players[currentPlayerIndex]?.id} />
@@ -765,6 +809,7 @@ function App() {
             </div>
           </div>
         </div>
+        )}
 
         {/* Easter eggs */}
         {(showNice || showBlazeIt) && (
