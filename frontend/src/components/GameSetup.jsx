@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getAllPlayers } from '../services/api';
 
-const GameSetup = ({ onStartGame, onViewHistory }) => {
+const GameSetup = ({ onStartGame, onViewHistory, onResumeGame }) => {
   const [gameMode, setGameMode] = useState('2player'); // 'solo' or '2player'
   const [player1Name, setPlayer1Name] = useState('');
   const [player2Name, setPlayer2Name] = useState('');
@@ -11,8 +11,9 @@ const GameSetup = ({ onStartGame, onViewHistory }) => {
   const [existingPlayers, setExistingPlayers] = useState([]);
   const [showPlayer1Suggestions, setShowPlayer1Suggestions] = useState(false);
   const [showPlayer2Suggestions, setShowPlayer2Suggestions] = useState(false);
+  const [hasSavedGame, setHasSavedGame] = useState(false);
 
-  // Load existing players on mount
+  // Load existing players and check for saved game on mount
   useEffect(() => {
     const loadPlayers = async () => {
       try {
@@ -23,6 +24,10 @@ const GameSetup = ({ onStartGame, onViewHistory }) => {
       }
     };
     loadPlayers();
+
+    // Check for saved game
+    const savedState = localStorage.getItem('dartsGameState');
+    setHasSavedGame(!!savedState);
   }, []);
 
   // Filter suggestions based on input and exclude the other player
@@ -295,6 +300,24 @@ const GameSetup = ({ onStartGame, onViewHistory }) => {
             </div>
           </div>
 
+          {/* Resume Game Button (if saved game exists) */}
+          {hasSavedGame && (
+            <button
+              onClick={onResumeGame}
+              className="w-full py-4 rounded-lg font-bold text-lg transition-all hover:opacity-90 flex items-center justify-center gap-2"
+              style={{
+                backgroundColor: '#fbbf24',
+                color: '#0a0e1a',
+              }}
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Resume Game
+            </button>
+          )}
+
           {/* Start Button */}
           <button
             onClick={handleStartGame}
@@ -304,7 +327,7 @@ const GameSetup = ({ onStartGame, onViewHistory }) => {
               color: '#0a0e1a',
             }}
           >
-            Start Game
+            Start New Game
           </button>
 
           {/* View History Button */}
