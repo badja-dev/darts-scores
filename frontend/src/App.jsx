@@ -70,6 +70,7 @@ function App() {
         currentDarts,
         turnStartScore,
         throwHistory,
+        activeTab,
         timestamp: Date.now(),
       };
       localStorage.setItem('dartsGameState', JSON.stringify(gameState));
@@ -77,7 +78,7 @@ function App() {
       // Clear saved game when complete
       localStorage.removeItem('dartsGameState');
     }
-  }, [gameStarted, gameComplete, gameId, legId, dbPlayerIds, gameType, gameFormat, currentLeg, totalLegs, players, currentPlayerIndex, currentDarts, turnStartScore, throwHistory]);
+  }, [gameStarted, gameComplete, gameId, legId, dbPlayerIds, gameType, gameFormat, currentLeg, totalLegs, players, currentPlayerIndex, currentDarts, turnStartScore, throwHistory, activeTab]);
 
   // Update checkout suggestion when current player's score changes
   useEffect(() => {
@@ -258,13 +259,15 @@ function App() {
     // Check for bust (score would go below 0 or to exactly 1)
     if (newScore < 0 || newScore === 1) {
       // Bust! Restore score to what it was at the start of this turn
-      setPlayers((prevPlayers) =>
-        prevPlayers.map((player, index) =>
-          index === currentPlayerIndex
-            ? { ...player, score: turnStartScore }
-            : player
-        )
-      );
+      if (turnStartScore !== null) {
+        setPlayers((prevPlayers) =>
+          prevPlayers.map((player, index) =>
+            index === currentPlayerIndex
+              ? { ...player, score: turnStartScore }
+              : player
+          )
+        );
+      }
 
       // Clear current darts and reset turn start score
       setCurrentDarts([]);
@@ -490,6 +493,7 @@ function App() {
       setCurrentDarts(gameState.currentDarts);
       setTurnStartScore(gameState.turnStartScore);
       setThrowHistory(gameState.throwHistory);
+      setActiveTab(gameState.activeTab || 'dartboard');
       setGameStarted(true);
 
       return true;
