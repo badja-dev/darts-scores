@@ -51,7 +51,7 @@ const Keypad = ({ onScoreSelect }) => {
   return (
     <div className="flex flex-col items-center space-y-6">
       {/* Score Display */}
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-xl lg:max-w-2xl">
         <div
           className="text-center p-6 rounded-lg mb-4"
           style={{ backgroundColor: '#0f1419' }}

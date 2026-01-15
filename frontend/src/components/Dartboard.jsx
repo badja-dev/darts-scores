@@ -18,10 +18,10 @@ const Dartboard = ({ onScoreSelect }) => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center">
+    <div className="flex items-center justify-center w-full h-full">
       <svg
         viewBox="0 0 400 400"
-        className="w-full max-w-2xl"
+        className="w-full h-full"
         style={{ filter: 'drop-shadow(0 4px 6px rgba(0, 0, 0, 0.3))' }}
       >
         {/* Outer border */}
@@ -109,14 +109,6 @@ const Dartboard = ({ onScoreSelect }) => {
           onClick={() => handleSegmentClick(25, 2)}
         />
       </svg>
-
-      <button
-        className="mt-4 px-6 py-2 rounded-lg font-semibold transition-colors"
-        style={{ backgroundColor: '#4a4a4a', color: 'white' }}
-        onClick={() => handleSegmentClick(0, 1)}
-      >
-        MISS
-      </button>
     </div>
   );
 };

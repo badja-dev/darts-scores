@@ -375,8 +375,10 @@ function App() {
   };
 
   // Undo last dart - also undo the score change
+  // If no current darts, undo the last completed turn
   const handleUndo = () => {
     if (currentDarts.length > 0) {
+      // Undo dart from current turn
       const lastDart = currentDarts[currentDarts.length - 1];
       const isEndlessMode = gameType === 'Endless';
       const currentPlayer = players[currentPlayerIndex];
@@ -409,6 +411,40 @@ function App() {
       if (restoredScore !== 420) {
         setShowBlazeIt(false);
       }
+    } else if (throwHistory.length > 0) {
+      // Undo the last completed turn
+      const isEndlessMode = gameType === 'Endless';
+
+      // Find the last turn's darts (same throwNumber and playerId)
+      const lastDart = throwHistory[throwHistory.length - 1];
+      const lastTurnDarts = throwHistory.filter(
+        t => t.throwNumber === lastDart.throwNumber && t.playerId === lastDart.playerId
+      );
+
+      // Calculate the total score of the last turn
+      const lastTurnTotal = lastTurnDarts.reduce((sum, d) => sum + d.score, 0);
+
+      // Find which player made the last turn
+      const lastPlayerIndex = players.findIndex(p => p.id === lastDart.playerId);
+
+      // Calculate what the score was BEFORE this turn (for turnStartScore)
+      const currentScore = players[lastPlayerIndex].score;
+      const scoreBeforeTurn = isEndlessMode
+        ? currentScore - lastTurnTotal
+        : currentScore + lastTurnTotal;
+
+      // DON'T change the player's score - the darts are already reflected in it
+      // We just need to move from history back to currentDarts
+
+      // Remove the last turn from history
+      setThrowHistory(prev => prev.filter(
+        t => !(t.throwNumber === lastDart.throwNumber && t.playerId === lastDart.playerId)
+      ));
+
+      // Switch back to that player and restore their darts
+      setCurrentPlayerIndex(lastPlayerIndex);
+      setCurrentDarts(lastTurnDarts.map(d => ({ score: d.score, multiplier: d.multiplier })));
+      setTurnStartScore(scoreBeforeTurn);
     }
   };
 
@@ -519,8 +555,8 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen p-4 md:p-8" style={{ backgroundColor: layoutMode === 'modern' ? '#1e3a5f' : '#0a0e1a' }}>
-      <div className="max-w-7xl mx-auto">
+    <div className={`min-h-screen ${layoutMode === 'modern' ? '' : 'p-4 md:p-8'}`} style={{ backgroundColor: layoutMode === 'modern' ? '#1e3a5f' : '#0a0e1a' }}>
+      <div className={layoutMode === 'modern' ? '' : 'max-w-7xl mx-auto'}>
         {/* Header */}
         {layoutMode === 'classic' && (
         <div
@@ -611,20 +647,66 @@ function App() {
         </div>
         )}
 
-        {/* Toggle Button (shown in both layouts) */}
-        <div className="mb-6 flex justify-end">
+        {/* Fixed Top-Right Buttons (shown in both layouts) */}
+        <div className="fixed top-4 right-4 z-50 flex gap-2">
+          {!gameComplete && (
+            <button
+              onClick={() => {
+                const isEndlessMode = gameType === 'Endless';
+                if (isEndlessMode) {
+                  if (confirm('End this game and view statistics?')) {
+                    setGameComplete(true);
+                    setActiveTab('stats');
+                  }
+                } else {
+                  if (confirm('Start a new game? All data will be cleared.')) {
+                    setGameStarted(false);
+                    setGameComplete(false);
+                    setThrowHistory([]);
+                    setCurrentDarts([]);
+                    setCurrentPlayerIndex(0);
+                  }
+                }
+              }}
+              className="px-3 py-2 rounded-lg font-semibold transition-all hover:opacity-80 flex items-center gap-2"
+              style={{ backgroundColor: '#4a4a4a', color: 'white' }}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={gameType === 'Endless' ? "M6 18L18 6M6 6l12 12" : "M12 4v16m8-8H4"} />
+              </svg>
+              {gameType === 'Endless' ? 'End' : 'New'}
+            </button>
+          )}
+          {gameComplete && (
+            <button
+              onClick={() => {
+                setGameStarted(false);
+                setGameComplete(false);
+                setThrowHistory([]);
+                setCurrentDarts([]);
+                setCurrentPlayerIndex(0);
+              }}
+              className="px-3 py-2 rounded-lg font-semibold transition-all hover:opacity-80 flex items-center gap-2"
+              style={{ backgroundColor: '#a3e635', color: '#0a0e1a' }}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              Menu
+            </button>
+          )}
           <button
             onClick={() => setLayoutMode(layoutMode === 'classic' ? 'modern' : 'classic')}
-            className="px-4 py-2 rounded-lg font-semibold transition-all hover:opacity-80 flex items-center gap-2"
+            className="px-3 py-2 rounded-lg font-semibold transition-all hover:opacity-80 flex items-center gap-2"
             style={{
               backgroundColor: layoutMode === 'modern' ? '#a3e635' : '#4a4a4a',
               color: layoutMode === 'modern' ? '#0a0e1a' : 'white',
             }}
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
             </svg>
-            {layoutMode === 'classic' ? 'Modern View' : 'Classic View'}
+            {layoutMode === 'classic' ? 'Modern' : 'Classic'}
           </button>
         </div>
 
@@ -699,6 +781,8 @@ function App() {
             gameType={gameType}
             currentLeg={currentLeg}
             totalLegs={totalLegs}
+            showNice={showNice}
+            showBlazeIt={showBlazeIt}
           />
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
