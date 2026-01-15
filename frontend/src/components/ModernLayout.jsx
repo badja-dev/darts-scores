@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import Dartboard from './Dartboard';
 import Keypad from './Keypad';
 import Table from './Table';
@@ -18,7 +19,21 @@ const ModernLayout = ({
   gameType,
   currentLeg,
   totalLegs,
+  showNice,
+  showBlazeIt,
 }) => {
+  // Random position for easter eggs - changes when they appear
+  const [easterEggPosition, setEasterEggPosition] = useState({ x: 50, y: 50, side: 'left' });
+
+  useEffect(() => {
+    if (showNice || showBlazeIt) {
+      setEasterEggPosition({
+        x: 10 + Math.random() * 80, // 10-90% horizontal within the side area
+        y: 20 + Math.random() * 60, // 20-80% vertical
+        side: Math.random() > 0.5 ? 'left' : 'right',
+      });
+    }
+  }, [showNice, showBlazeIt]);
   // Calculate player statistics
   const calculatePlayerStats = (playerId) => {
     const playerThrows = throwHistory.filter(t => t.playerId === playerId && !t.bust);
@@ -42,7 +57,6 @@ const ModernLayout = ({
       };
     }
 
-    // Calculate 3-dart average by grouping by throw number
     const turnMap = new Map();
     playerThrows.forEach(dart => {
       const throwNum = dart.throwNumber || 1;
@@ -63,7 +77,6 @@ const ModernLayout = ({
     const totalScore = playerThrows.reduce((sum, t) => sum + t.score, 0);
     const oneDartAverage = totalScore / playerThrows.length;
 
-    // Amount breakdown (180s, 160-179, etc.)
     const amountBreakdown = {
       '180s': turnScores.filter(s => s === 180).length,
       '160-179': turnScores.filter(s => s >= 160 && s < 180).length,
@@ -75,7 +88,6 @@ const ModernLayout = ({
       '0-59': turnScores.filter(s => s >= 0 && s < 60).length,
     };
 
-    // Top segments
     const segmentHits = {};
     playerThrows.forEach(dart => {
       if (dart.score === 0) return;
@@ -93,24 +105,10 @@ const ModernLayout = ({
       threeDartAverage,
       oneDartAverage,
       turnScores,
+      turnBreakdowns: turns,
       amountBreakdown,
       topSegments,
     };
-  };
-
-  // Get turn-by-turn history for center display
-  const getTurnHistory = () => {
-    const turnMap = new Map();
-    throwHistory.forEach(dart => {
-      const key = `${dart.playerId}-${dart.throwNumber}`;
-      if (!turnMap.has(key)) {
-        turnMap.set(key, { playerId: dart.playerId, darts: [], total: 0 });
-      }
-      const turn = turnMap.get(key);
-      turn.darts.push(dart);
-      turn.total += dart.score;
-    });
-    return Array.from(turnMap.values());
   };
 
   const formatDart = (dart) => {
@@ -125,329 +123,238 @@ const ModernLayout = ({
   const player2 = players[1];
   const stats1 = calculatePlayerStats(player1?.id);
   const stats2 = player2 ? calculatePlayerStats(player2.id) : null;
-  const turnHistory = getTurnHistory();
+
+  // Stats panel component
+  const StatsPanel = ({ stats, align }) => (
+    <div className={`flex flex-col gap-3 text-white text-sm ${align === 'right' ? 'text-right' : 'text-left'}`}>
+      <div className="rounded-lg p-3" style={{ backgroundColor: '#2c4f7c' }}>
+        <div className="font-bold text-base mb-2">AVERAGES</div>
+        <div className="flex justify-between gap-4">
+          <span>3 DART</span>
+          <span className="font-bold">{stats.threeDartAverage.toFixed(1)}</span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span>1 DART</span>
+          <span className="font-bold">{stats.oneDartAverage.toFixed(1)}</span>
+        </div>
+      </div>
+      <div className="rounded-lg p-3" style={{ backgroundColor: '#2c4f7c' }}>
+        <div className="font-bold text-base mb-2">AMOUNT</div>
+        {Object.entries(stats.amountBreakdown).map(([range, count]) => (
+          <div key={range} className="flex justify-between gap-4">
+            <span>{range}</span>
+            <span className="font-bold">{count}</span>
+          </div>
+        ))}
+      </div>
+      {stats.topSegments.length > 0 && (
+        <div className="rounded-lg p-3" style={{ backgroundColor: '#2c4f7c' }}>
+          <div className="font-bold text-base mb-2">TOP SEGM</div>
+          {stats.topSegments.map(({ segment, count }) => {
+            const [multiplier, number] = segment.split('x');
+            let label = multiplier === '3' ? `T${number}` : multiplier === '2' ? `D${number}` : number;
+            return (
+              <div key={segment} className="flex justify-between gap-4">
+                <span>{label}</span>
+                <span className="font-bold">{count}x</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 
   return (
-    <div className="min-h-screen p-4" style={{ backgroundColor: '#1e3a5f' }}>
-      <div className="max-w-[1600px] mx-auto">
-        {/* Top Score Display */}
-        <div className="rounded-lg mb-6" style={{ backgroundColor: '#2c4f7c' }}>
-          <div className="text-center py-2 text-sm font-semibold" style={{ color: '#fff' }}>
-            {gameType !== 'Endless' && totalLegs > 1 && `BEST OF ${totalLegs} LEGS`}
-          </div>
-          {player2 ? (
-            <div className="relative">
-              <div className="grid grid-cols-2 divide-x" style={{ borderColor: '#1e3a5f' }}>
-                {/* Player 1 Score */}
-                <div className="p-6 text-center">
-                  <div className="text-8xl font-bold text-white mb-2">
-                    {player1?.score}
-                  </div>
-                  <div className="text-xl font-semibold text-white mb-1">
-                    {player1?.name}
-                    {currentPlayerIndex === 0 && (
-                      <>
-                        <span className="inline-block w-3 h-3 rounded-full bg-green-400 ml-2"></span>
-                        <span className="inline-block w-3 h-3 rounded-full bg-green-400 ml-1"></span>
-                      </>
-                    )}
-                  </div>
-                  {suggestedCheckout && currentPlayerIndex === 0 && (
-                    <div className="text-sm text-gray-300">{suggestedCheckout}</div>
-                  )}
-                </div>
+    <div className="h-screen flex flex-col" style={{ backgroundColor: '#1e3a5f' }}>
+      {/* Tabs at top */}
+      <div className="flex justify-center py-1 flex-shrink-0">
+        {['dartboard', 'keypad', 'table'].map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className="px-4 py-1 font-semibold capitalize"
+            style={{ color: activeTab === tab ? '#a3e635' : '#888' }}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
 
-                {/* Player 2 Score */}
-                <div className="p-6 text-center">
-                  <div className="text-8xl font-bold text-white mb-2">
-                    {player2.score}
-                  </div>
-                  <div className="text-xl font-semibold text-white mb-1">
-                    {player2.name}
-                    {currentPlayerIndex === 1 && (
-                      <>
-                        <span className="inline-block w-3 h-3 rounded-full bg-green-400 ml-2"></span>
-                        <span className="inline-block w-3 h-3 rounded-full bg-green-400 ml-1"></span>
-                      </>
-                    )}
-                  </div>
-                  {suggestedCheckout && currentPlayerIndex === 1 && (
-                    <div className="text-sm text-gray-300">{suggestedCheckout}</div>
-                  )}
-                </div>
-              </div>
-
-              {/* Legs Display (Center Overlay) */}
-              <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center text-white pointer-events-none">
-                <div className="text-xs mb-2">LEGS</div>
-                <div className="flex gap-4 text-2xl font-bold">
-                  <div>{player1?.legsWon || 0}</div>
-                  <div className="text-gray-400">-</div>
-                  <div>{player2?.legsWon || 0}</div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            /* Solo Mode - Single Player */
-            <div className="p-6 text-center">
-              <div className="text-8xl font-bold text-white mb-2">
-                {player1?.score}
-              </div>
-              <div className="text-xl font-semibold text-white mb-1">
-                {player1?.name}
-                <>
-                  <span className="inline-block w-3 h-3 rounded-full bg-green-400 ml-2"></span>
-                  <span className="inline-block w-3 h-3 rounded-full bg-green-400 ml-1"></span>
-                </>
-              </div>
-              {suggestedCheckout && (
-                <div className="text-sm text-gray-300">{suggestedCheckout}</div>
-              )}
+      {/* Main content area */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Stats - at edge */}
+        <div className="w-48 p-2 pt-12 flex-shrink-0 overflow-y-auto relative">
+          <StatsPanel stats={stats1} align="left" />
+          {/* Easter egg - left side */}
+          {(showNice || showBlazeIt) && easterEggPosition.side === 'left' && (
+            <div
+              className="absolute text-2xl font-bold pointer-events-none animate-pulse"
+              style={{
+                color: '#a3e635',
+                left: `${easterEggPosition.x}%`,
+                top: `${easterEggPosition.y}%`,
+                transform: 'translate(-50%, -50%)',
+                textShadow: '0 0 10px #a3e635',
+              }}
+            >
+              {showNice ? 'nice' : 'blaze it'}
             </div>
           )}
         </div>
 
-        {/* Main Content Grid */}
-        <div className={`grid grid-cols-1 ${player2 ? 'lg:grid-cols-12' : 'lg:grid-cols-9'} gap-4`}>
-          {/* Left Sidebar - Player 1 Stats */}
-          <div className={`${player2 ? 'lg:col-span-3' : 'lg:col-span-2'} space-y-4`}>
-            <div className="rounded-lg p-4" style={{ backgroundColor: '#2c4f7c' }}>
-              <h3 className="text-lg font-bold text-white mb-3">GAME AVERAGES</h3>
-              <div className="space-y-2 text-white">
-                <div className="flex justify-between">
-                  <span className="text-sm">3 DART</span>
-                  <span className="font-bold">{stats1.threeDartAverage.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm">1 DART</span>
-                  <span className="font-bold">{stats1.oneDartAverage.toFixed(2)}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-lg p-4" style={{ backgroundColor: '#2c4f7c' }}>
-              <h3 className="text-lg font-bold text-white mb-3">AMOUNT</h3>
-              <div className="space-y-1 text-white text-sm">
-                {Object.entries(stats1.amountBreakdown).map(([range, count]) => (
-                  <div key={range} className="flex justify-between">
-                    <span>{range}</span>
-                    <span className="font-bold">{count}</span>
+        {/* Center - Scores + Dartboard */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Score Display */}
+          <div className={`flex items-start px-4 mb-1 mt-10 ${player2 ? 'justify-between' : 'justify-center'}`}>
+            {player2 ? (
+              <>
+                <div className="flex flex-col items-center">
+                  <div className={`rounded-lg px-6 py-3 text-center ${currentPlayerIndex === 0 ? 'ring-2 ring-green-400' : ''}`} style={{ backgroundColor: '#2c4f7c' }}>
+                    <div className="text-7xl font-bold text-white">{player1?.score}</div>
+                    <div className="text-lg text-white">{player1?.name}</div>
+                    {suggestedCheckout && currentPlayerIndex === 0 && (
+                      <div className="text-sm text-gray-300">{suggestedCheckout}</div>
+                    )}
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {stats1.topSegments.length > 0 && (
-              <div className="rounded-lg p-4" style={{ backgroundColor: '#2c4f7c' }}>
-                <h3 className="text-lg font-bold text-white mb-3">TOP SEGMENTS</h3>
-                <div className="space-y-2 text-white text-sm">
-                  {stats1.topSegments.map(({ segment, count }) => {
-                    const [multiplier, number] = segment.split('x');
-                    let label = '';
-                    if (multiplier === '3') label = `T${number}`;
-                    else if (multiplier === '2') label = `D${number}`;
-                    else label = number;
-                    return (
-                      <div key={segment} className="flex justify-between">
-                        <span>{label}</span>
-                        <span className="font-bold">{count}x</span>
+                  {/* Player 1 Turn History */}
+                  <div className="mt-2 h-32 overflow-y-auto w-full">
+                    {stats1.turnBreakdowns && [...stats1.turnBreakdowns].reverse().map((turn, idx) => (
+                      <div key={idx} className="text-white text-sm flex justify-between px-2 py-0.5" style={{ backgroundColor: idx % 2 === 0 ? 'rgba(44, 79, 124, 0.5)' : 'transparent' }}>
+                        <span className="text-gray-400">{stats1.turnBreakdowns.length - idx}.</span>
+                        <span className="font-bold">{turn.total}</span>
+                        <span className="text-gray-300 text-xs">{turn.darts.map(d => formatDart(d)).join(', ')}</span>
                       </div>
-                    );
-                  })}
+                    ))}
+                  </div>
+                </div>
+                <div className="flex flex-col items-center justify-center text-white pt-4">
+                  <div className="text-sm text-gray-400">LEGS</div>
+                  <div className="text-2xl font-bold">{player1?.legsWon || 0} - {player2?.legsWon || 0}</div>
+                </div>
+                <div className="flex flex-col items-center">
+                  <div className={`rounded-lg px-6 py-3 text-center ${currentPlayerIndex === 1 ? 'ring-2 ring-green-400' : ''}`} style={{ backgroundColor: '#2c4f7c' }}>
+                    <div className="text-7xl font-bold text-white">{player2?.score}</div>
+                    <div className="text-lg text-white">{player2?.name}</div>
+                    {suggestedCheckout && currentPlayerIndex === 1 && (
+                      <div className="text-sm text-gray-300">{suggestedCheckout}</div>
+                    )}
+                  </div>
+                  {/* Player 2 Turn History */}
+                  <div className="mt-2 h-32 overflow-y-auto w-full">
+                    {stats2?.turnBreakdowns && [...stats2.turnBreakdowns].reverse().map((turn, idx) => (
+                      <div key={idx} className="text-white text-sm flex justify-between px-2 py-0.5" style={{ backgroundColor: idx % 2 === 0 ? 'rgba(44, 79, 124, 0.5)' : 'transparent' }}>
+                        <span className="text-gray-400">{stats2.turnBreakdowns.length - idx}.</span>
+                        <span className="font-bold">{turn.total}</span>
+                        <span className="text-gray-300 text-xs">{turn.darts.map(d => formatDart(d)).join(', ')}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-col items-center">
+                <div className="rounded-lg px-12 py-3 text-center" style={{ backgroundColor: '#2c4f7c' }}>
+                  <div className="text-7xl font-bold text-white">{player1?.score}</div>
+                  <div className="text-lg text-white">{player1?.name}</div>
+                  {suggestedCheckout && <div className="text-sm text-gray-300">{suggestedCheckout}</div>}
+                </div>
+                {/* Solo Player Turn History */}
+                <div className="mt-2 h-32 overflow-y-auto w-full">
+                  {stats1.turnBreakdowns && [...stats1.turnBreakdowns].reverse().map((turn, idx) => (
+                    <div key={idx} className="text-white text-sm flex justify-between gap-4 px-2 py-0.5" style={{ backgroundColor: idx % 2 === 0 ? 'rgba(44, 79, 124, 0.5)' : 'transparent' }}>
+                      <span className="text-gray-400">{stats1.turnBreakdowns.length - idx}.</span>
+                      <span className="font-bold">{turn.total}</span>
+                      <span className="text-gray-300 text-xs">{turn.darts.map(d => formatDart(d)).join(', ')}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
           </div>
 
-          {/* Center Column - History & Input */}
-          <div className={`${player2 ? 'lg:col-span-6' : 'lg:col-span-7'} space-y-4`}>
-            {/* Score History */}
-            <div className="rounded-lg p-4 max-h-[400px] overflow-y-auto" style={{ backgroundColor: '#2c4f7c' }}>
-              <h3 className="text-lg font-bold text-white mb-4">SCORE HISTORY</h3>
-              <div className="space-y-3">
-                {turnHistory.slice().reverse().map((turn, index) => {
-                  const player = players.find(p => p.id === turn.playerId);
-                  const isBust = turn.darts.some(dart => dart.bust);
-                  return (
-                    <div
-                      key={`${turn.playerId}-${turn.darts[0]?.throwNumber || index}`}
-                      className="flex items-center justify-between p-3 rounded"
-                      style={{ backgroundColor: isBust ? '#5c1f1f' : '#1e3a5f' }}
-                    >
-                      <div className="text-white text-sm font-semibold w-20">
-                        {player?.name}
-                      </div>
-                      <div className="flex-1 text-center text-white">
-                        {turn.darts.map((dart, i) => formatDart(dart)).join(', ')}
-                      </div>
-                      <div className="text-2xl font-bold text-white w-20 text-right">
-                        {isBust ? <span className="text-red-400">BUST</span> : turn.total}
-                      </div>
-                    </div>
-                  );
-                })}
-                {turnHistory.length === 0 && (
-                  <div className="text-center text-gray-400 py-8">
-                    No throws yet
-                  </div>
-                )}
+          {/* Dartboard/Input - fills remaining space */}
+          <div className="flex-1 flex items-center justify-center overflow-hidden">
+            {activeTab === 'dartboard' && (
+              <div className="h-full aspect-square">
+                <Dartboard onScoreSelect={onScoreSelect} />
               </div>
-            </div>
-
-            {/* Current Turn Display */}
-            <div className="rounded-lg p-4" style={{ backgroundColor: '#2c4f7c' }}>
-              <div className="text-center mb-4">
-                <div className="text-white text-lg font-semibold mb-2">
-                  Current Turn - {players[currentPlayerIndex]?.name}
-                </div>
-                <div className="grid grid-cols-3 gap-4 max-w-md mx-auto">
-                  {[0, 1, 2].map((index) => (
-                    <div
-                      key={index}
-                      className="aspect-square rounded-lg flex items-center justify-center text-3xl font-bold"
-                      style={{ backgroundColor: '#1e3a5f', color: 'white' }}
-                    >
-                      {currentDarts[index] !== undefined ? (
-                        currentDarts[index].score === 0 ? '-' : currentDarts[index].score
-                      ) : (
-                        <span className="text-gray-600">-</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="grid grid-cols-3 gap-3 mb-4 max-w-md mx-auto">
-                <button
-                  onClick={onUndo}
-                  disabled={currentDarts.length === 0 || gameComplete}
-                  className="px-4 py-2 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{
-                    backgroundColor: currentDarts.length === 0 || gameComplete ? '#4a4a4a' : '#ef4444',
-                    color: 'white',
-                  }}
-                >
-                  Undo
-                </button>
-                <button
-                  onClick={onReset}
-                  disabled={currentDarts.length === 0 || gameComplete}
-                  className="px-4 py-2 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{
-                    backgroundColor: currentDarts.length === 0 || gameComplete ? '#4a4a4a' : '#f59e0b',
-                    color: 'white',
-                  }}
-                >
-                  Reset
-                </button>
-                <button
-                  onClick={onCompleteTurn}
-                  disabled={currentDarts.length === 0 || gameComplete}
-                  className="px-4 py-2 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{
-                    backgroundColor: currentDarts.length === 0 || gameComplete ? '#4a4a4a' : '#22c55e',
-                    color: 'white',
-                  }}
-                >
-                  Complete
-                </button>
-              </div>
-
-              {/* Input Tabs */}
-              <div className="flex gap-2 mb-4 justify-center">
-                <button
-                  onClick={() => setActiveTab('dartboard')}
-                  className="px-4 py-2 rounded-lg font-semibold transition-colors"
-                  style={{
-                    backgroundColor: activeTab === 'dartboard' ? '#1e3a5f' : 'transparent',
-                    color: activeTab === 'dartboard' ? '#a3e635' : '#888',
-                  }}
-                >
-                  Dartboard
-                </button>
-                <button
-                  onClick={() => setActiveTab('keypad')}
-                  className="px-4 py-2 rounded-lg font-semibold transition-colors"
-                  style={{
-                    backgroundColor: activeTab === 'keypad' ? '#1e3a5f' : 'transparent',
-                    color: activeTab === 'keypad' ? '#a3e635' : '#888',
-                  }}
-                >
-                  Keypad
-                </button>
-                <button
-                  onClick={() => setActiveTab('table')}
-                  className="px-4 py-2 rounded-lg font-semibold transition-colors"
-                  style={{
-                    backgroundColor: activeTab === 'table' ? '#1e3a5f' : 'transparent',
-                    color: activeTab === 'table' ? '#a3e635' : '#888',
-                  }}
-                >
-                  Table
-                </button>
-              </div>
-
-              {/* Input Method */}
-              <div>
-                {activeTab === 'dartboard' && <Dartboard onScoreSelect={onScoreSelect} />}
-                {activeTab === 'keypad' && <Keypad onScoreSelect={onScoreSelect} />}
-                {activeTab === 'table' && <Table onScoreSelect={onScoreSelect} />}
-              </div>
-            </div>
+            )}
+            {activeTab === 'keypad' && <Keypad onScoreSelect={onScoreSelect} />}
+            {activeTab === 'table' && <Table onScoreSelect={onScoreSelect} />}
           </div>
+        </div>
 
-          {/* Right Sidebar - Player 2 Stats */}
-          {player2 && stats2 && (
-            <div className="lg:col-span-3 space-y-4">
-              <div className="rounded-lg p-4" style={{ backgroundColor: '#2c4f7c' }}>
-                <h3 className="text-lg font-bold text-white mb-3">GAME AVERAGES</h3>
-                <div className="space-y-2 text-white">
-                  <div className="flex justify-between">
-                    <span className="text-sm">3 DART</span>
-                    <span className="font-bold">{stats2.threeDartAverage.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm">1 DART</span>
-                    <span className="font-bold">{stats2.oneDartAverage.toFixed(2)}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-lg p-4" style={{ backgroundColor: '#2c4f7c' }}>
-                <h3 className="text-lg font-bold text-white mb-3">AMOUNT</h3>
-                <div className="space-y-1 text-white text-sm">
-                  {Object.entries(stats2.amountBreakdown).map(([range, count]) => (
-                    <div key={range} className="flex justify-between">
-                      <span>{range}</span>
-                      <span className="font-bold">{count}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {stats2.topSegments.length > 0 && (
-                <div className="rounded-lg p-4" style={{ backgroundColor: '#2c4f7c' }}>
-                  <h3 className="text-lg font-bold text-white mb-3">TOP SEGMENTS</h3>
-                  <div className="space-y-2 text-white text-sm">
-                    {stats2.topSegments.map(({ segment, count }) => {
-                      const [multiplier, number] = segment.split('x');
-                      let label = '';
-                      if (multiplier === '3') label = `T${number}`;
-                      else if (multiplier === '2') label = `D${number}`;
-                      else label = number;
-                      return (
-                        <div key={segment} className="flex justify-between">
-                          <span>{label}</span>
-                          <span className="font-bold">{count}x</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+        {/* Right Stats - at edge */}
+        <div className="w-48 p-2 pt-12 flex-shrink-0 overflow-y-auto relative">
+          {player2 && stats2 ? (
+            <StatsPanel stats={stats2} align="right" />
+          ) : (
+            <StatsPanel stats={stats1} align="right" />
+          )}
+          {/* Easter egg - right side */}
+          {(showNice || showBlazeIt) && easterEggPosition.side === 'right' && (
+            <div
+              className="absolute text-2xl font-bold pointer-events-none animate-pulse"
+              style={{
+                color: '#a3e635',
+                left: `${easterEggPosition.x}%`,
+                top: `${easterEggPosition.y}%`,
+                transform: 'translate(-50%, -50%)',
+                textShadow: '0 0 10px #a3e635',
+              }}
+            >
+              {showNice ? 'nice' : 'blaze it'}
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Bottom Controls */}
+      <div className="p-2 flex-shrink-0" style={{ backgroundColor: '#2c4f7c' }}>
+        <div className="flex items-center justify-center gap-4">
+          {/* Current darts */}
+          <div className="flex gap-2">
+            {[0, 1, 2].map((index) => (
+              <div
+                key={index}
+                className="w-16 h-12 rounded flex items-center justify-center text-2xl font-bold"
+                style={{ backgroundColor: '#1e3a5f', color: 'white' }}
+              >
+                {currentDarts[index] !== undefined ? (
+                  currentDarts[index].score === 0 ? '-' : currentDarts[index].score
+                ) : (
+                  <span className="text-gray-600">-</span>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Action buttons */}
+          <button
+            onClick={() => onScoreSelect(0, 1)}
+            disabled={currentDarts.length >= 3 || gameComplete}
+            className="px-4 py-2 rounded font-bold transition-all disabled:opacity-50"
+            style={{ backgroundColor: '#6b7280', color: 'white' }}
+          >
+            MISS
+          </button>
+          <button
+            onClick={onCompleteTurn}
+            disabled={currentDarts.length === 0 || gameComplete}
+            className="px-4 py-2 rounded font-bold transition-all disabled:opacity-50"
+            style={{ backgroundColor: currentDarts.length === 0 || gameComplete ? '#4a4a4a' : '#22c55e', color: 'white' }}
+          >
+            DONE
+          </button>
+          <button
+            onClick={onUndo}
+            disabled={(currentDarts.length === 0 && throwHistory.length === 0) || gameComplete}
+            className="px-4 py-2 rounded font-bold transition-all disabled:opacity-50"
+            style={{ backgroundColor: '#6b7280', color: 'white' }}
+          >
+            ↺
+          </button>
         </div>
       </div>
     </div>
